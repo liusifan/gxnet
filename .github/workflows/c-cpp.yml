@@ -1,0 +1,27 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: make
+      run: make
+    - name: unit test
+      run: ./testbackward 
+    - name: testseeds
+      run: ./testseeds
+    - name: testmnist
+      run: ./testmnist 
+    - name: testuat
+      run: sh testuat.sh uat
+    - name: testuat
+      run: sh testuat.sh uat/ian
