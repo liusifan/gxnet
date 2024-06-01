@@ -316,11 +316,14 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 
 	int logInterval = epochCount / 10;
 
+	std::random_device rd;
+	std::mt19937 gen( rd() );
+
 	for( int n = 0; n < epochCount; n++ ) {
 
 		std::vector< int > idxOfData( input.size() );
 		std::iota( idxOfData.begin(), idxOfData.end(), 0 );
-		if( isShuffle ) std::random_shuffle( idxOfData.begin(), idxOfData.end() );
+		if( isShuffle ) std::shuffle( idxOfData.begin(), idxOfData.end(), gen );
 
 		GX_DataType totalError = 0;
 
