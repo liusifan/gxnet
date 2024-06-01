@@ -19,7 +19,7 @@ do
 
 	test -f $i".mnist" && ./gxocr mnist.model $i".mnist"
 
-	if [ $target == $? ];
+	if [ "$target" -eq "$?" ];
 	then
 		match=$((match+1))
 	fi
