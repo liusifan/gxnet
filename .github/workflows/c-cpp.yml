@@ -1,0 +1,27 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: make
+      run: cd gxnet; make
+    - name: unit test
+      run: cd gxnet; ./testbackward 
+    - name: testseeds
+      run: cd gxnet; ./testseeds
+    - name: testmnist
+      run: cd gxnet; ./testmnist 
+    - name: testuat
+      run: cd gxnet; sh testuat.sh uat
+    - name: testuat
+      run: cd gxnet; sh testuat.sh uat/ian
