@@ -21,6 +21,8 @@ jobs:
       run: cd gxnet; ./testseeds
     - name: testmnist
       run: cd gxnet; ./testmnist 
+    - name: Install Python PIL
+      run: pip install Pillow
     - name: testuat
       run: cd gxnet; sh testuat.sh uat
     - name: testuat
