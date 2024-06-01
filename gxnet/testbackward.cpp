@@ -2,6 +2,8 @@
 #include "gxnet.h"
 #include "gxutils.h"
 
+#include <stdio.h>
+
 void check( const char * tag, GX_Network & network, GX_DataVector & input, GX_DataVector & target )
 {
 	printf( "%s\n", tag );

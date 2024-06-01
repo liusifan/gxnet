@@ -13,6 +13,7 @@
 
 #include <unistd.h>
 #include <syslog.h>
+#include <stdio.h>
 
 void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_DataMatrix & target, bool isDebug )
 {

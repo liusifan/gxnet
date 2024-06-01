@@ -12,6 +12,7 @@
 #include <float.h>
 
 #include <unistd.h>
+#include <stdio.h>
 
 /*
 * Load comma separated values from file and normalize the values
