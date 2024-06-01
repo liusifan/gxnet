@@ -54,9 +54,9 @@ void GX_Utils :: printMnistImage( const char * tag, const GX_DataVector & data )
 {
 	printf( "%s { %ld }\n", tag, data.size() );
 
-	for( int i = 0; i < 28; i++ ) {
-		for( int j = 0; j < 28; j++ ) {
-			int idx = i * 28 + j;
+	for( size_t i = 0; i < 28; i++ ) {
+		for( size_t j = 0; j < 28; j++ ) {
+			size_t idx = i * 28 + j;
 			printf( "%s ",  idx < data.size() && data[ idx ] != 0 ? "1" : "0" );
 		}
 		printf( "\n" );
