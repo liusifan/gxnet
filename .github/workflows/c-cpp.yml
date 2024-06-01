@@ -13,17 +13,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: change dir
-      run: cd gxnet
     - name: make
-      run: make
+      run: cd gxnet; make
     - name: unit test
-      run: ./testbackward 
+      run: cd gxnet; ./testbackward 
     - name: testseeds
-      run: ./testseeds
+      run: cd gxnet; ./testseeds
     - name: testmnist
-      run: ./testmnist 
+      run: cd gxnet; ./testmnist 
     - name: testuat
-      run: sh testuat.sh uat
+      run: cd gxnet; sh testuat.sh uat
     - name: testuat
-      run: sh testuat.sh uat/ian
+      run: cd gxnet; sh testuat.sh uat/ian
