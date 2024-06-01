@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: change dir
+      run: cd gxnet
     - name: make
       run: make
     - name: unit test
