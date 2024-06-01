@@ -5,7 +5,7 @@ CFLAGS = -std=c++11 -Wall -g
 
 CPPFLAGS = $(CFLAGS) -Wno-invalid-offsetof
 
-LDFLAGS = -lstdc++
+LDFLAGS = -lstdc++ -lm
 
 ######################################################################
 
