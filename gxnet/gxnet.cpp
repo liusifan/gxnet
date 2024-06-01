@@ -8,6 +8,9 @@
 
 #include <random>
 #include <numeric>
+#include <algorithm>
+#include <vector>
+#include <iostream>
 
 GX_Neuron :: GX_Neuron( const int weightCount )
 {
