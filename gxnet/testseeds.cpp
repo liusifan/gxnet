@@ -170,11 +170,11 @@ int main( const int argc, char * argv[] )
 {
 	CmdArgs_t defaultArgs = {
 		.mEvalCount = 42,
-		.mIsShuffle = true,
 		.mEpochCount = 10,
 		.mMiniBatchCount = 1,
 		.mLearningRate = 0.3,
 		.mIsDebug = false,
+		.mIsShuffle = true,
 	};
 
 	CmdArgs_t args = defaultArgs;

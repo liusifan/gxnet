@@ -124,12 +124,12 @@ int main( const int argc, char * argv[] )
 	CmdArgs_t defaultArgs = {
 		.mTrainingCount = 0,
 		.mEvalCount = 0,
-		.mIsShuffle = true,
 		.mEpochCount = 5,
 		.mMiniBatchCount = 10,
 		.mLearningRate = 3.0,
 		.mLambda = 5.0,
 		.mIsDebug = false,
+		.mIsShuffle = true,
 	};
 
 	CmdArgs_t args = defaultArgs;
