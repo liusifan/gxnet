@@ -2,16 +2,28 @@ which python || alias python=python3
 
 if [ $# != 1 ];
 then
-	echo "Usage: $1 <jpeg image dir>"
+	echo "Usage: $1 <jpeg image file/dir>"
 	exit
 fi
 
-dir=$1
+path=$1
 
 match=0
 total=0
 
-for i in `ls $dir/*.jpeg $dir/*.jpg`;
+files=""
+
+if [ -d $path ];
+then
+	files=`ls $path/*.jpeg $path/*.jpg  2>/dev/null`
+fi
+
+if [ -f $path ];
+then
+	files=$path
+fi
+
+for i in $files;
 do
 	target=`echo $i | grep -o '[0-9]' | head -1`
 
@@ -27,5 +39,5 @@ do
 	total=$((total+1))
 done
 
-echo "$match / $total "
+echo "result $match / $total "
 

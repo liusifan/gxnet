@@ -75,8 +75,8 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 
 		bool ret = network.forward( input[ i ], &output );
 
-		int outputType = std::max_element( output.back().begin(), output.back().end() ) - output.back().begin();
-		int targetType = std::max_element( target[ i ].begin(), target[ i ].end() ) - target[ i ].begin();
+		int outputType = GX_Utils::max_index( output.back().begin(), output.back().end() );
+		int targetType = GX_Utils::max_index( target[ i ].begin(), target[ i ].end() );
 
 		if( isDebug ) printf( "forward %d, index %zu, %d %d\n", ret, i, outputType, targetType );
 

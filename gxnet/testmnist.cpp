@@ -34,8 +34,8 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 			return;
 		}
 
-		int outputType = std::max_element( output.back().begin(), output.back().end() ) - output.back().begin();
-		int targetType = std::max_element( target[ i ].begin(), target[ i ].end() ) - target[ i ].begin();
+		int outputType = GX_Utils::max_index( output.back().begin(), output.back().end() );
+		int targetType = GX_Utils::max_index( target[ i ].begin(), target[ i ].end() );
 
 		if( isDebug ) printf( "forward %d, index %zu, %d %d\n", ret, i, outputType, targetType );
 
@@ -46,35 +46,64 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 		}
 	}
 
-	printf( "GX_Network %s, %d/%ld = %.2f\n", tag, correct, input.size(), ((float)correct) / input.size() );
+	printf( "check %s, %d/%ld = %.2f\n", tag, correct, input.size(), ((float)correct) / input.size() );
 }
 
 bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * target,
 		GX_DataMatrix * input4eval, GX_DataMatrix * target4eval )
 {
 	const char * path = "mnist/train-images.idx3-ubyte";
-	if( ! GX_Utils::readMnistImages( args.mTrainingCount, path, input ) ) {
+	if( ! GX_Utils::loadMnistImages( args.mTrainingCount, path, input ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
 	path = "mnist/train-labels.idx1-ubyte";
-	if( ! GX_Utils::readMnistLabels( args.mTrainingCount, path, target ) ) {
+	if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
+	// load rotated images
+	path = "mnist/train-images.idx3-ubyte.rot";
+	if( 0 == access( path, F_OK ) ) {
+		if( ! GX_Utils::loadMnistImages( args.mTrainingCount, path, input ) ) {
+			printf( "read %s fail\n", path );
+			return false;
+		}
+
+		path = "mnist/train-labels.idx1-ubyte.rot";
+		if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target ) ) {
+			printf( "read %s fail\n", path );
+			return false;
+		}
+	}
+
+	// center mnist images
+	size_t orgSize = input->size();
+
+	for( size_t i = 0; i < orgSize; i++ ) {
+		GX_DataVector newImage;
+		if( GX_Utils::centerMnistImage( ( *input )[ i ], &newImage ) ) {
+			input->push_back( newImage );
+			target->push_back( ( *target )[ i ] );
+		}
+	}
+
 	path = "mnist/t10k-images.idx3-ubyte";
-	if( ! GX_Utils::readMnistImages( args.mEvalCount, path, input4eval ) ) {
+	if( ! GX_Utils::loadMnistImages( args.mEvalCount, path, input4eval ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
 	path = "mnist/t10k-labels.idx1-ubyte";
-	if( ! GX_Utils::readMnistLabels( args.mEvalCount, path, target4eval ) ) {
+	if( ! GX_Utils::loadMnistLabels( args.mEvalCount, path, target4eval ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
+
+	printf( "input { %zu }, target { %zu }, input4eval { %zu }, target4eval { %zu }\n",
+			input->size(), target->size(), input4eval->size(), target4eval->size() );
 
 	return true;
 }
@@ -89,13 +118,22 @@ void test( const CmdArgs_t & args )
 	}
 
 	const char * path = "./mnist.model";
+
 	//train & save model
 	{
-
 		GX_Network network;
 
-		network.addLayer( 30, input[ 0 ].size() );
-		network.addLayer( target[ 0 ].size(), 30 );
+		if( NULL != args.mModelPath && 0 == access( args.mModelPath, F_OK ) ) {
+			if(  GX_Utils::load( args.mModelPath, &network ) ) {
+				printf( "continue training %s\n", args.mModelPath );
+			} else {
+				printf( "load( %s ) fail\n", args.mModelPath );
+				return;
+			}
+		} else {
+			network.addLayer( 100, input[ 0 ].size() );
+			network.addLayer( target[ 0 ].size(), 100 );
+		}
 
 		check( "before train", network, input4eval, target4eval, args.mIsDebug );
 
@@ -125,7 +163,7 @@ int main( const int argc, char * argv[] )
 		.mTrainingCount = 0,
 		.mEvalCount = 0,
 		.mEpochCount = 5,
-		.mMiniBatchCount = 10,
+		.mMiniBatchCount = 100,
 		.mLearningRate = 3.0,
 		.mLambda = 5.0,
 		.mIsDebug = false,

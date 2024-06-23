@@ -2,62 +2,94 @@ from __future__ import print_function
 
 from PIL import Image, ImageFilter
 import sys
+import numpy as np
+
+def drop_margin( img ):
+	begin_x, begin_y = 28, 28
+	end_x, end_y = 0, 0
+
+	for x in range( img.size[ 0 ] ):
+		for y in range( img.size[ 1 ] ):
+			if img.getpixel( ( x, y ) ) != 255:
+				begin_x, begin_y = min( begin_x, x ), min( begin_y, y )
+				end_x, end_y = max( end_x, x ), max( end_y, y )
+
+	img.crop( ( begin_x, begin_y, end_x, end_y ) )
+
+def resize2mnist( org_img ):
+
+	width = float( org_img.size[ 0 ] )
+	height = float( org_img.size[ 1 ] )
+
+	new_img = Image.new( 'L', ( 28, 28 ), ( 255 ) )
+
+	limit_len = 20
+	margin_size = int( ( 28 - limit_len ) / 2 )
+
+	if width > height:
+		new_height = int( round( ( limit_len / width * height ), 0 ) )
+		if new_height == 0: new_height = 1
+		top = int( round( ( ( 28 - new_height ) / 2), 0 ) )
+
+		org_img = org_img.resize( ( limit_len, new_height ), Image.BICUBIC ).filter( ImageFilter.SHARPEN )
+		new_img.paste( org_img, ( margin_size, top ) )
+	else:
+		new_width = int( round( ( limit_len / height * width ), 0 ) )
+		if new_width == 0:  new_width = 1
+		left = int( round( ( ( 28 - new_width ) / 2 ), 0 ) )
+
+		org_img = org_img.resize( ( new_width, limit_len ), Image.BICUBIC ).filter( ImageFilter.SHARPEN )
+		new_img.paste( org_img, ( left, margin_size ) )
+
+	num_array = np.array( new_img.getdata() )
+	num_array = 255 - num_array
+	num_array = num_array.reshape( ( 28, 28 ) )
+
+	new_img = Image.fromarray( np.uint8( num_array ) )
+
+	return new_img
 
 def conv2mnist( path ):
 
-	limitLen = 20
+	org_img = Image.open( path ).convert( "RGBA" )
+	pixel_data = org_img.load()
 
-	orgImg = Image.open( path ).convert( 'L' )
-	width = float( orgImg.size[ 0 ] )
-	height = float( orgImg.size[ 1 ] )
+	# set all non-white pixels to black
+	for x in range( org_img.size[ 0 ] ):
+		for y in range( org_img.size[ 1 ] ):
+			if any( pixel_data[ x, y ][ i ] < 220 for i in range( 4 ) ):
+				pixel_data[ x, y ] = 0, 0, 0
 
-	newImg = Image.new( 'L', ( 28, 28 ), ( 255 ) )
+	org_img = org_img.convert( 'L' )
 
-	if width > height:
-		newHeight = int( round( ( limitLen / width * height ), 0 ) )
-		if newHeight == 0: newHeight = 1
-		top = int( round( ( ( 28 - newHeight ) / 2), 0 ) )
+	drop_margin( org_img )
 
-		orgImg = orgImg.resize( ( limitLen, newHeight ), Image.BICUBIC ).filter( ImageFilter.SHARPEN )
-		newImg.paste( orgImg, ( 4, top ) )
-	else:
-		newWidth = int( round( ( limitLen / height * width ), 0 ) )
-		if newWidth == 0:  newWidth = 1
-		left = int( round( ( ( 28 - newWidth ) / 2 ), 0 ) )
+	new_img = resize2mnist( org_img )
 
-		orgImg = orgImg.resize( ( newWidth, limitLen ), Image.BICUBIC ).filter( ImageFilter.SHARPEN )
-		newImg.paste( orgImg, ( left, 4 ) )
+	# save the intermediate result for debug
+	new_img.save( path + ".bmp" )
 
+	num_list = list( new_img.getdata() )
 
-	"""
-	for x in range( newImg.size[ 0 ] ):
-		for y in range( newImg.size[ 1 ] ):
-			#print( newImg.getpixel( ( x, y ) ) )
-			if newImg.getpixel( ( x, y ) ) != 255:
-				newImg.putpixel( ( x, y ), 0 )
-	"""
-
-	newImg.save( path + ".bmp" )
-
-	numList = list( newImg.getdata() )
-	numList = [ ( 255 - x ) * 1.0 / 255.0 for x in numList ]
-
+	# save the result you really need
 	fp = open( path + ".mnist", "w" )
-	fp.write( ",".join( map( str, numList ) ) )
+	fp.write( ",".join( map( str, num_list ) ) )
 	fp.close()
 
-	return numList
+	return num_list
 
-if( len( sys.argv ) < 2 ):
-	print( "Usage: %s <img file>\n" % ( sys.argv[ 0 ] ) )
-	sys.exit( -1 )
+if __name__ == '__main__':
 
-data = conv2mnist( sys.argv[ 1 ] )
+	if( len( sys.argv ) < 2 ):
+		print( "Usage: %s <img file>\n" % ( sys.argv[ 0 ] ) )
+		sys.exit( -1 )
 
-for i in range( 0, 28 ):
-	for j in range( 0, 28 ):
-		if data[ i * 28 + j ] == 0 : print( "0", end="" )
-		else: print( "1", end="" )
-	print( "" )
+	data = conv2mnist( sys.argv[ 1 ] )
+
+	for i in range( 0, 28 ):
+		for j in range( 0, 28 ):
+			if data[ i * 28 + j ] == 0 : print( "0", end="" )
+			else: print( "1", end="" )
+		print( "" )
 
 

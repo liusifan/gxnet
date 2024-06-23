@@ -322,6 +322,8 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 	std::random_device rd;
 	std::mt19937 gen( rd() );
 
+	time_t beginTime = time( NULL );
+
 	for( int n = 0; n < epochCount; n++ ) {
 
 		std::vector< int > idxOfData( input.size() );
@@ -366,8 +368,12 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 			end = begin + miniBatchCount;
 		}
 
-		if( logInterval <= 1 || ( logInterval > 1 && 0 == n % logInterval ) || n == ( epochCount - 1 ) )
-			printf( "%ld [>] epoch %d, lr %f, error %.8f\n", time( NULL ), n, learningRate, totalError );
+		if( logInterval <= 1 || ( logInterval > 1 && 0 == n % logInterval ) || n == ( epochCount - 1 ) ) {
+			time_t currTime = time( NULL );
+			printf( "%s\tinterval %ld [>] epoch %d, lr %f, error %.8f\n",
+				ctime( &currTime ), currTime - beginTime, n, learningRate, totalError );
+			beginTime = time( NULL );
+		}
 
 		if( mIsDebug ) print();
 	}

@@ -25,7 +25,7 @@ bool readImage( const char * path, GX_DataVector * input )
 
 		data->resize( srow.size(), 0 );
 		for( size_t i = 0; i < srow.size(); i++ ) {
-			( *data )[ i ] = std::stod( srow[ i ] );
+			( *data )[ i ] = std::stod( srow[ i ] ) / 255.0;
 		}
 	};
 
@@ -68,9 +68,23 @@ int test( const char * modelFile, const char * imgFile )
 		return -1;
 	}
 
-	int result = std::max_element( output.back().begin(), output.back().end() ) - output.back().begin();
+	int result = GX_Utils::max_index( output.back().begin(), output.back().end() );
 
-	printf( "%s is %d\n", imgFile, result );
+	GX_DataType total = std::accumulate( input.begin(), input.end(), 0.0 );
+	GX_DataType mean = total / input.size();
+
+	GX_DataType variance = 0;
+	std::for_each( input.begin(), input.end(), [&]( const GX_DataType d ) { variance += ( d - mean ) * ( d - mean ); });
+	variance = variance / input.size();
+
+	printf( "%s  \t-> %d, nn.output %f, mean %f, variance %f\n", imgFile, result, output.back()[ result ], mean, variance );
+
+	if( output.back()[ result ] < 0.5 ) {
+		GX_DataType outputTotal = std::accumulate( output.back().begin(), output.back().end(), 0.0 );
+		for( size_t i = 0; i < output.back().size(); i++ ) {
+			printf( "\t%zu %.2f %.2f\n", i, output.back()[ i ], output.back()[ i ] / outputTotal );
+		}
+	}
 
 	return result;
 }

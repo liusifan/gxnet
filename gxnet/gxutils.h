@@ -2,6 +2,8 @@
 
 #include "gxnet.h"
 
+#include <algorithm>
+
 typedef struct tagCmdArgs {
 	int mTrainingCount;
 	int mEvalCount;
@@ -11,20 +13,29 @@ typedef struct tagCmdArgs {
 	float mLambda;
 	bool mIsDebug;
 	bool mIsShuffle;
+	const char * mModelPath;
 } CmdArgs_t;
 
 
 class GX_Utils {
 public:
+	template< class ForwardIt >
+	static int max_index( ForwardIt first, ForwardIt last )
+	{
+		return std::distance( first, std::max_element( first, last ) );
+	}
+
 	static GX_DataType random();
 
 	static GX_DataType calcSSE( const GX_DataVector & output, const GX_DataVector & target );
 
 	static void printMnistImage( const char * tag, const GX_DataVector & data );
 
-	static bool readMnistImages( const int limitCount, const char * path, GX_DataMatrix * images );
+	static bool centerMnistImage( GX_DataVector & orgImage, GX_DataVector * newImage );
 
-	static bool readMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels );
+	static bool loadMnistImages( const int limitCount, const char * path, GX_DataMatrix * images );
+
+	static bool loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels );
 
 	static void printMatrix( const char * tag, const GX_DataMatrix & data );
 

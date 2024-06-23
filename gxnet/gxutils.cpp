@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <assert.h>
 
+#include <arpa/inet.h>
+
 GX_DataType GX_Utils :: calcSSE( const GX_DataVector & output, const GX_DataVector & target )
 {
 	assert( output.size() == target.size() );
@@ -63,14 +65,62 @@ void GX_Utils :: printMnistImage( const char * tag, const GX_DataVector & data )
 	}
 }
 
-bool GX_Utils :: readMnistImages( const int limitCount, const char * path, GX_DataMatrix * images )
+bool GX_Utils :: centerMnistImage( GX_DataVector & orgImage, GX_DataVector * newImage )
 {
-	auto reverseInt = []( int i ) {
-		unsigned char c1, c2, c3, c4;
-		c1 = i & 255, c2 = (i >> 8) & 255, c3 = (i >> 16) & 255, c4 = (i >> 24) & 255;
-		return ((int)c1 << 24) + ((int)c2 << 16) + ((int)c3 << 8) + c4;
-	};
+	bool ret = false;
 
+	GX_DataType buff[ 28 ] [ 28 ];
+
+	for( int x = 0; x < 28; x++ ) {
+		for( int y = 0; y < 28; y++ ) {
+			buff[ x ][ y ] = orgImage[ x * 28 + y ];
+		}
+	}
+
+	int beginX = INT_MAX, beginY = INT_MAX, endX = INT_MIN, endY = INT_MIN;
+
+	for( int x = 0; x < 28; x++ ) {
+		for( int y = 0; y < 28; y++ ) {
+			if( buff[ x ][ y ] != 0 ) {
+				beginX = std::min( x, beginX );
+				beginY = std::min( y, beginY );
+
+				endX = std::max( x, endX );
+				endY = std::max( y, endY );
+			}
+		}
+	}
+
+	int marginX = ( 28 - ( endX - beginX ) ) / 2;
+	int marginY = ( 28 - ( endY - beginY ) ) / 2;
+
+	if( marginX != beginX || marginY != beginY ) {
+
+		GX_DataType newBuff[ 28 ][ 28 ];
+		memset( newBuff, 0, sizeof( newBuff ) );
+
+		newImage->resize( orgImage.size(), 0 );
+
+		for( int x = beginX; x < endX; x++ ) {
+			for( int y = beginY; y < endY; y++ ) {
+				newBuff[ marginX + x - beginX ][ marginY + y - beginY ] = buff[ x ][ y ];
+			}
+		}
+
+		for( int x = 0; x < 28; x++ ) {
+			for( int y = 0; y < 28; y++ ) {
+				( *newImage )[ x * 28 + y ] = newBuff[ x ][ y ];
+			}
+		}
+
+		ret = true;
+	}
+
+	return ret;
+}
+
+bool GX_Utils :: loadMnistImages( const int limitCount, const char * path, GX_DataMatrix * images )
+{
 	std::ifstream file( path, std::ios::binary );
 
 	if( ! file.is_open() ) {
@@ -82,18 +132,18 @@ bool GX_Utils :: readMnistImages( const int limitCount, const char * path, GX_Da
 	int imageCount = 0, imageSize = 0;
 
 	file.read( ( char * )&magic, sizeof( magic ) );
-	magic = reverseInt( magic );
+	magic = ntohl( magic );
 
 	if( magic != 2051 ) return false;
 
 	file.read( ( char * )&imageCount, sizeof( imageCount ) );
-	imageCount = reverseInt( imageCount );
+	imageCount = ntohl( imageCount );
 
 	file.read( ( char * )&rows, sizeof( rows ) );
-	rows = reverseInt( rows );
+	rows = ntohl( rows );
 
 	file.read( ( char * )&cols, sizeof( cols ));
-	cols = reverseInt( cols );
+	cols = ntohl( cols );
 
 	imageSize = rows * cols;
 
@@ -122,14 +172,8 @@ bool GX_Utils :: readMnistImages( const int limitCount, const char * path, GX_Da
 	return ret;
 }
 
-bool GX_Utils :: readMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels )
+bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels )
 {
-	auto reverseInt = []( int i ) {
-		unsigned char c1, c2, c3, c4;
-		c1 = i & 255, c2 = (i >> 8) & 255, c3 = (i >> 16) & 255, c4 = (i >> 24) & 255;
-		return ((int)c1 << 24) + ((int)c2 << 16) + ((int)c3 << 8) + c4;
-	};
-
 	std::ifstream file( path, std::ios::binary );
 
 	if( ! file.is_open() ) {
@@ -140,12 +184,12 @@ bool GX_Utils :: readMnistLabels( int limitCount, const char * path, GX_DataMatr
 	int magic = 0, labelCount = 0;
 
 	file.read( ( char * )&magic, sizeof( magic ) );
-	magic = reverseInt( magic );
+	magic = ntohl( magic );
 
 	if(magic != 2049) return false;
 
 	file.read( ( char * )&labelCount, sizeof( labelCount ) );
-	labelCount = reverseInt( labelCount );
+	labelCount = ntohl( labelCount );
 
 	bool ret = true;
 
@@ -310,7 +354,7 @@ void GX_Utils :: getCmdArgs( int argc, char * const argv[],
 
 	*args = defaultArgs;;
 
-	while( ( c = getopt ( argc, argv, "a:t:c:e:l:n:dv" )) != EOF ) {
+	while( ( c = getopt ( argc, argv, "a:t:c:e:l:b:p:dv" )) != EOF ) {
 		switch ( c ) {
 			case 't':
 				args->mTrainingCount = atoi( optarg );
@@ -336,6 +380,9 @@ void GX_Utils :: getCmdArgs( int argc, char * const argv[],
 			case 'd':
 				args->mIsDebug = true;
 				break;
+			case 'p':
+				args->mModelPath = optarg;
+				break;
 			case '?' :
 			case 'v' :
 				printf( "Usage: %s [-v]\n", argv[ 0 ] );
@@ -346,6 +393,7 @@ void GX_Utils :: getCmdArgs( int argc, char * const argv[],
 				printf( "\t-l <learning rate> default is %.2f\n", defaultArgs.mLearningRate );
 				printf( "\t-a <lambda> default is %.2f\n", defaultArgs.mLambda );
 				printf( "\t-s <shuffle> 0 for no shuffle, otherwise shuffle, default is %d\n", defaultArgs.mIsShuffle );
+				printf( "\t-p <model path> if path exist, then continue training\n" );
 				printf( "\t-d debug mode on\n" );
 				printf( "\t-v show usage\n" );
 				exit( 0 );
@@ -356,6 +404,8 @@ void GX_Utils :: getCmdArgs( int argc, char * const argv[],
 	printf( "\ttrainingCount %d, evalCount %d\n", args->mTrainingCount, args->mEvalCount );
 	printf( "\tepochCount %d, miniBatchCount %d, learningRate %f, lambda %f\n",
 		args->mEpochCount, args->mMiniBatchCount, args->mLearningRate, args->mLambda );
-	printf( "\tisShuffle %s, isDebug %s\n", args->mIsShuffle ? "true" : "false", args->mIsDebug ? "true" : "false" );
+	printf( "\tshuffle %s, debug %s\n", args->mIsShuffle ? "true" : "false", args->mIsDebug ? "true" : "false" );
+	printf( "\tmodelPath %s\n", NULL == args->mModelPath ? "NULL" : args->mModelPath );
+	printf( "\n" );
 }
 
