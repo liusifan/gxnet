@@ -1,4 +1,11 @@
 # gxnet
+
+一个玩具级的神经网络训练框架，用于自学神经网络基础知识
+
+[![Build Status](https://github.com/liusifan/gxnet/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/liusifan/gxnet/actions?query=workflow:ci)
+
+开发过程
+-------
 用 C++ 从零开始实现一个玩具级的神经网络训练框架
 
 这个项目的想法来自于 [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/) 这本书。书上以经典的 MNIST 数据集作为目标，用不到 100 行的 Python 代码实现了一个可以运行的神经网络，并且在测试集上可以达到 95% 以上的准确率，非常令人惊讶。
