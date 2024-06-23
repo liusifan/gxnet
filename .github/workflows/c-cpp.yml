@@ -21,5 +21,7 @@ jobs:
       run: cd gxnet; ./testseeds
     - name: Install Python PIL
       run: pip install Pillow
+    - name: Install Python numpy
+      run: pip install numpy
     - name: launch mnist
       run: cd gxnet; sh launch_mnist.sh
