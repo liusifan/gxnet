@@ -2,7 +2,7 @@ which python || alias python=python3
 
 python rotate_mnist.py
 
-./testmnist -l 10
+./testmnist -l 5
 
 sh testuat.sh uat
 sh testuat.sh uat/ian

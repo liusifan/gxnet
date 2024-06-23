@@ -1,5 +1,5 @@
 
-CFLAGS = -std=c++11 -Wall -g
+CFLAGS = -std=c++11 -Wall -g -O3 -DNDEBUG
 #-Wall -Werror -g
 #-Wno-unused-result
 
