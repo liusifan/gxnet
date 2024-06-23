@@ -8,6 +8,7 @@
 #include <regex>
 #include <random>
 #include <numeric>
+#include <climits>
 
 #include <unistd.h>
 #include <assert.h>
