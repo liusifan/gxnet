@@ -371,12 +371,15 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 {
 	if( input.size() != target.size() ) return false;
 
+	time_t beginTime = time( NULL );
+
+	printf( "%s\tstart train, input { %zu }, target { %zu }\n",
+			ctime( &beginTime ), input.size(), target.size() );
+
 	int logInterval = epochCount / 10;
 
 	std::random_device rd;
 	std::mt19937 gen( rd() );
-
-	time_t beginTime = time( NULL );
 
 	GX_DataMatrix miniBatchGrad, grad;
 	initGradMatrix( mLayers, &miniBatchGrad, &grad );

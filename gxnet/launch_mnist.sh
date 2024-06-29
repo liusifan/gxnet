@@ -1,4 +1,4 @@
-which python || alias python=python3
+which python > /dev/null 2>&1|| alias python=python3
 
 train_images="mnist/train-images.idx3-ubyte"
 train_labels="mnist/train-labels.idx1-ubyte"
