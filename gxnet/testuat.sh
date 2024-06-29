@@ -1,4 +1,4 @@
-which python || alias python=python3
+which python > /dev/null 2>&1|| alias python=python3
 
 if [ $# -eq 0 ];
 then

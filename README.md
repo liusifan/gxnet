@@ -4,6 +4,20 @@
 
 [![Build Status](https://github.com/liusifan/gxnet/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/liusifan/gxnet/actions?query=workflow:ci)
 
+编译和运行
+--------
+可以参考项目自带的 github workflow 脚本 [c-cpp workflow](.github/workflows/c-cpp.yml)
+
+或者按照以下步骤执行
+```
+git clone git@github.com:liusifan/gxnet.git
+cd gxnet/gxnet
+make
+pip install Pillow
+pip install numpy
+sh launch_mnist.sh
+```
+
 开发过程
 -------
 用 C++ 从零开始实现一个玩具级的神经网络训练框架
