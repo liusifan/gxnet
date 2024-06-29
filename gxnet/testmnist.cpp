@@ -21,6 +21,14 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 
 	if( isDebug ) network.print();
 
+	GX_DataMatrix confusionMatrix;
+	GX_DataVector targetTotal;
+
+	size_t maxClasses = target[ 0 ].size();
+	confusionMatrix.resize( maxClasses );
+	targetTotal.resize( maxClasses );
+	for( size_t i = 0; i < maxClasses; i++ ) confusionMatrix[ i ].resize( maxClasses, 0.0 );
+
 	int correct = 0;
 
 	for( size_t i = 0; i < input.size(); i++ ) {
@@ -41,12 +49,21 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 
 		if( outputType == targetType ) correct++;
 
+		confusionMatrix[ targetType ][ outputType ] += 1;
+		targetTotal[ targetType ] += 1;
+
 		for( size_t j = 0; isDebug && j < output.back().size() && j < 10; j++ ) {
 			printf( "\t%zu %.8f %.8f\n", j, output.back()[ j ], target[ i ][ j ] );
 		}
 	}
 
 	printf( "check %s, %d/%ld = %.2f\n", tag, correct, input.size(), ((float)correct) / input.size() );
+
+	for( size_t i = 0; i < confusionMatrix.size(); i++ ) {
+		for( auto & item : confusionMatrix[ i ] ) item = item / targetTotal[ i ];
+	}
+
+	GX_Utils::printMatrix( "confusion matrix", confusionMatrix, false, true );
 }
 
 bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * target,
@@ -59,7 +76,7 @@ bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * ta
 	}
 
 	path = "mnist/train-labels.idx1-ubyte";
-	if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target ) ) {
+	if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target, 10 ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
@@ -73,7 +90,7 @@ bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * ta
 		}
 
 		path = "mnist/train-labels.idx1-ubyte.rot";
-		if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target ) ) {
+		if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target, 10 ) ) {
 			printf( "read %s fail\n", path );
 			return false;
 		}
@@ -97,7 +114,7 @@ bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * ta
 	}
 
 	path = "mnist/t10k-labels.idx1-ubyte";
-	if( ! GX_Utils::loadMnistLabels( args.mEvalCount, path, target4eval ) ) {
+	if( ! GX_Utils::loadMnistLabels( args.mEvalCount, path, target4eval, 10 ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}

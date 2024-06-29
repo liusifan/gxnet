@@ -40,15 +40,17 @@ GX_DataType GX_Utils :: random()
 
 void GX_Utils :: addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src )
 {
-	dest->reserve( src.size() );
-	for( size_t i = 0; i < src.size(); i++ ) {
-		if( dest->size() <= i ) {
-			dest->push_back( GX_DataVector() );
-			dest->back().resize( src[ i ].size(), 0 );
-		}
+	assert( dest->size() == src.size() );
 
-		for( size_t j = 0; j < src[ i ].size(); j++ ) {
-			( *dest )[ i ][ j ] += src[ i ][ j ];
+	for( size_t i = 0; i < src.size(); i++ ) {
+
+		GX_DataVector & destVec = dest->at( i );
+		const GX_DataVector & srcVec = src[ i ];
+
+		assert( destVec.size() == srcVec.size() );
+
+		for( size_t j = 0; j < srcVec.size(); j++ ) {
+			destVec[ j ] += srcVec[ j ];
 		}
 	}
 }
@@ -91,6 +93,9 @@ bool GX_Utils :: centerMnistImage( GX_DataVector & orgImage, GX_DataVector * new
 			}
 		}
 	}
+
+	endX++;
+	endY++;
 
 	int marginX = ( 28 - ( endX - beginX ) ) / 2;
 	int marginY = ( 28 - ( endY - beginY ) ) / 2;
@@ -170,10 +175,12 @@ bool GX_Utils :: loadMnistImages( const int limitCount, const char * path, GX_Da
 	}
 	free( buff );
 
+	printf( "%s load %s images %zu\n", __func__, path, images->size() );
+
 	return ret;
 }
 
-bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels )
+bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels, int maxClasses )
 {
 	std::ifstream file( path, std::ios::binary );
 
@@ -187,7 +194,10 @@ bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatr
 	file.read( ( char * )&magic, sizeof( magic ) );
 	magic = ntohl( magic );
 
-	if(magic != 2049) return false;
+	if( magic != 2049 ) {
+		printf( "read %s, invalid magic %d\n", path, magic );
+		return false;
+	}
 
 	file.read( ( char * )&labelCount, sizeof( labelCount ) );
 	labelCount = ntohl( labelCount );
@@ -201,35 +211,52 @@ bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatr
 	unsigned char buff = 0;
 
 	for(int i = 0; i < labelCount; i++) {
-		if( ( ! file.read( ( char * )&buff, 1 ) ) || buff >= 10 ) {
-			printf( "%s read fail\n", __func__ );
+		if( ( ! file.read( ( char * )&buff, 1 ) ) || buff >= maxClasses ) {
+			printf( "%s read fail, label %d\n", __func__, buff );
 			ret = false;
 			break;
 		}
 
 		labels->push_back( GX_DataVector() );
-		labels->back().resize( 10, 0 );
+		labels->back().resize( maxClasses, 0 );
 		labels->back()[ buff ] = 1;
 	}
+
+	printf( "%s load %s labels %zu\n", __func__, path, labels->size() );
 
 	return ret;
 }
 
-void GX_Utils :: printMatrix( const char * tag, const GX_DataMatrix & data )
+void GX_Utils :: printMatrix( const char * tag, const GX_DataMatrix & data,
+		bool useSciFmt, bool colorMax )
 {
 	printf( "%s { %ld }\n", tag, data.size() );
 	for( size_t i = 0; i < data.size(); i++ ) {
 		printf( "#%ld ", i );
-		for( auto & j : data[ i ] ) printf( "%.8e ", j );
+
+		int idx = max_index( data[ i ].begin(), data[ i ].end() );
+
+		for( size_t j = 0; j < data[ i ].size(); j++ ) {
+			const char * fmt = "%.2f ";
+
+			if( colorMax && j == idx ) {
+				fmt = useSciFmt ? "\e[1;31m%8e\e[0m " : "\e[1;31m%.2f\e[0m ";
+			} else {
+				fmt = useSciFmt ? "%8e " : "%.2f ";
+			}
+
+			printf( fmt, data[ i ][ j ] );
+		}
+
 		printf( "\n" );
 	}
 }
 
-void GX_Utils :: printVector( const char * tag, const GX_DataVector & data )
+void GX_Utils :: printVector( const char * tag, const GX_DataVector & data, bool useSciFmt )
 {
 	printf( "%s { %ld }\n", tag, data.size() );
 
-	for( auto & i : data ) printf( "%.8e ", i );
+	for( auto & i : data ) printf( useSciFmt ? "%.8e " : "%.2f ", i );
 
 	printf( "\n" );
 }

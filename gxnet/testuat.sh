@@ -1,12 +1,24 @@
 which python || alias python=python3
 
-if [ $# != 1 ];
+if [ $# -eq 0 ];
 then
-	echo "Usage: $1 <jpeg image file/dir>"
+	echo "Usage: $1 <jpeg image file/dir> [<model file>] [<uat suffix>]"
 	exit
 fi
 
 path=$1
+model="mnist.model"
+suffix="mnist"
+
+if [ $# -gt 1 ];
+then
+	model=$2
+fi
+
+if [ $# -gt 2 ];
+then
+	suffix=$3
+fi
 
 match=0
 total=0
@@ -25,11 +37,11 @@ fi
 
 for i in $files;
 do
-	target=`echo $i | grep -o '[0-9]' | head -1`
+	target=`echo $i | grep -Eo '([0-9]+)' | head -1`
 
-	test -f $i".mnist" || python ./conv2mnist.py $i
+	test -f $i"."$suffix || python ./conv2mnist.py $i
 
-	test -f $i".mnist" && ./gxocr mnist.model $i".mnist"
+	test -f $i"."$suffix && ./gxocr $model $i"."$suffix
 
 	if [ "$target" -eq "$?" ];
 	then

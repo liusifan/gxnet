@@ -45,6 +45,8 @@ bool readImage( const char * path, GX_DataVector * input )
 
 	getNumberVector( '[' == line[ 0 ] ? line.c_str() + 1 : line, input );
 
+	//printf( "%s read %s, size %zu\n", __func__, path, input->size() );
+
 	return true;
 }
 
@@ -55,13 +57,13 @@ int test( const char * modelFile, const char * imgFile )
 
 	if( ! readImage( imgFile, &input ) ) return -1;
 
-	//GX_Utils::printMnistImage( "read", input );
-
 	GX_Network network;
 
 	if( ! GX_Utils::load( modelFile, &network ) ) return -1;
 
-	bool ret = network.forward( input, &output );
+	GX_DataVector * realInput = &input;
+
+	bool ret = network.forward( *realInput, &output );
 
 	if( ! ret ) {
 		printf( "forward fail\n" );
@@ -70,19 +72,12 @@ int test( const char * modelFile, const char * imgFile )
 
 	int result = GX_Utils::max_index( output.back().begin(), output.back().end() );
 
-	GX_DataType total = std::accumulate( input.begin(), input.end(), 0.0 );
-	GX_DataType mean = total / input.size();
-
-	GX_DataType variance = 0;
-	std::for_each( input.begin(), input.end(), [&]( const GX_DataType d ) { variance += ( d - mean ) * ( d - mean ); });
-	variance = variance / input.size();
-
-	printf( "%s  \t-> %d, nn.output %f, mean %f, variance %f\n", imgFile, result, output.back()[ result ], mean, variance );
+	printf( "%s    \t-> %d, nn.output %f\n", imgFile, result, output.back()[ result ] );
 
 	if( output.back()[ result ] < 0.5 ) {
-		GX_DataType outputTotal = std::accumulate( output.back().begin(), output.back().end(), 0.0 );
+		//GX_DataType outputTotal = std::accumulate( output.back().begin(), output.back().end(), 0.0 );
 		for( size_t i = 0; i < output.back().size(); i++ ) {
-			printf( "\t%zu %.2f %.2f\n", i, output.back()[ i ], output.back()[ i ] / outputTotal );
+			//printf( "\t%zu %.2f %.2f\n", i, output.back()[ i ], output.back()[ i ] / outputTotal );
 		}
 	}
 

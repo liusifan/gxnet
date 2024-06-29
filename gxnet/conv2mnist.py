@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 def drop_margin( img ):
-	begin_x, begin_y = 28, 28
+	begin_x, begin_y = img.size[ 0 ], img.size[ 1 ]
 	end_x, end_y = 0, 0
 
 	for x in range( img.size[ 0 ] ):
@@ -13,6 +13,9 @@ def drop_margin( img ):
 			if img.getpixel( ( x, y ) ) != 255:
 				begin_x, begin_y = min( begin_x, x ), min( begin_y, y )
 				end_x, end_y = max( end_x, x ), max( end_y, y )
+
+	end_x += 1
+	end_y += 1
 
 	img.crop( ( begin_x, begin_y, end_x, end_y ) )
 
@@ -69,14 +72,12 @@ def conv2mnist( path ):
 	# save the intermediate result for debug
 	new_img.save( path + ".bmp" )
 
-	num_list = list( new_img.getdata() )
-
-	# save the result you really need
+	# save mnist data
 	fp = open( path + ".mnist", "w" )
-	fp.write( ",".join( map( str, num_list ) ) )
+	fp.write( ",".join( map( str, list( new_img.getdata() ) ) ) )
 	fp.close()
 
-	return num_list
+	return list( new_img.getdata() )
 
 if __name__ == '__main__':
 

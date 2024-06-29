@@ -4,15 +4,17 @@ import struct
 import numpy as np
 import random
 import ctypes
+import sys
 
 from PIL import Image
 
 def print_mnist( data ):
+	tmp = data.reshape( -1 )
 	for i in range( 28 ):
 		for j in range( 28 ):
-			if data[ i * 28 + j ] == 0 : print( "0", end="" )
+			if tmp[ i * 28 + j ] == 0 : print( "0", end="" )
 			else: print( "1", end="" )
-			#print( data[ i * 28 + j ], " ", end="" )
+			#print( tmp[ i * 28 + j ], " ", end="" )
 		print( "" )
 
 def read_mnist_images( path ):
@@ -26,7 +28,7 @@ def read_mnist_images( path ):
 	fmt_header = '>iiii'
 	magic_number, num_images, num_rows, num_cols = struct.unpack_from( fmt_header, buff, offset )
 
-	print( "load {}, magic：{}，count：{}".format( path, magic_number, num_images ) )
+	print( "load {}, magic {}, count {}".format( path, magic_number, num_images ) )
 
 	offset += struct.calcsize( fmt_header )
 	fmt_image = '>' + str( num_rows * num_cols ) + 'B'
@@ -49,7 +51,7 @@ def read_mnist_labels( path ):
 	fmt_header = '>ii'
 	magic_number, label_num = struct.unpack_from(fmt_header, buff, offset)
 
-	print( "load {}, magic：{}，count：{}".format( path, magic_number, label_num ) )
+	print( "load {}, magic {}, count {}".format( path, magic_number, label_num ) )
 
 	offset += struct.calcsize(fmt_header)
 	labels = []
@@ -61,9 +63,7 @@ def read_mnist_labels( path ):
 		offset += struct.calcsize( fmt_label )
 	return labels
 
-def rotate( rotation_range, image_path, label_path ):
-
-	print( "rotation_range {}".format( rotation_range ) )
+def convert( image_path, label_path, suffix, transform ):
 
 	images = read_mnist_images( image_path )
 	labels = read_mnist_labels( label_path )
@@ -77,8 +77,8 @@ def rotate( rotation_range, image_path, label_path ):
 
 	magic_labels = 2049
 
-	fp = open( image_path + ".rot", "wb" )
-	fp2 = open( label_path + ".rot", "wb" )
+	fp = open( image_path + "." + suffix, "wb" )
+	fp2 = open( label_path + "." + suffix, "wb" )
 
 	buff = struct.pack( '>IIII', magic_images, num_images, rows, cols )
 	fp.write( buff )
@@ -86,16 +86,11 @@ def rotate( rotation_range, image_path, label_path ):
 	buff = struct.pack( '>II', magic_labels, num_images )
 	fp2.write( buff )
 
-	for buff, label in zip( images[ 0 : num_images ], labels[ 0 : num_images ] ):
-		org_img = Image.fromarray( np.uint8( buff ) )
+	for array, label in zip( images[ 0 : num_images ], labels[ 0 : num_images ] ):
 
-		while True:
-			theta = float( random.uniform( rotation_range[ 0 ], rotation_range[ 1 ] ) )
-			if 0 != theta: break
+		new_array = transform( array, label )
 
-		new_img = org_img.rotate( theta, resample = Image.BICUBIC )
-
-		new_buff = np.array( new_img ).ravel()
+		new_buff = new_array.astype( np.uint8 ).ravel()
 
 		buff = struct.pack( fmt_image, *new_buff )
 		fp.write( buff )
@@ -109,7 +104,50 @@ def rotate( rotation_range, image_path, label_path ):
 	fp.close()
 	fp2.close()
 
+def rotate_mnist( rotation_range, image_path, label_path ):
+
+	def transform( org_array, label ):
+		while True:
+			theta = float( random.uniform( rotation_range[ 0 ], rotation_range[ 1 ] ) )
+			if 0 != theta: break
+
+		org_img = Image.fromarray( np.uint8( org_array ) )
+		new_img = org_img.rotate( theta, resample = Image.BICUBIC )
+
+		return np.array( new_img )
+
+	print( "rotation_range {}".format( rotation_range ) )
+
+	convert( image_path, label_path, "rot", transform )
+
+def recover_emnist( image_path, label_path ):
+
+	def transform( org_array, label ):
+		new_array = np.rot90( np.flip( org_array, axis = 0 ), -1 )
+
+		# for debug
+		if transform.count == 0:
+			#print( label )
+			#print_mnist( org_array )
+			#print_mnist( new_array )
+			transform.count += 1
+
+		return new_array
+
+	transform.count = 0
+
+	convert( image_path, label_path, "rcv", transform )
+
 if __name__ == '__main__':
 
-	rotate( [ -15, 15 ], "mnist/train-images.idx3-ubyte", "mnist/train-labels.idx1-ubyte" )
+	if( len( sys.argv ) < 4 ):
+		print( "Usage: %s <rotate|recover> <images idx3 file> <labels idx1 file>\n" % ( sys.argv[ 0 ] ) )
+		sys.exit( -1 )
+
+	if sys.argv[ 1 ] == "rotate":
+		rotate_mnist( [ -15, 15 ], sys.argv[ 2 ], sys.argv[ 3 ] )
+	elif sys.argv[ 1 ] == "recover":
+		recover_emnist( sys.argv[ 2 ], sys.argv[ 3 ] )
+	else:
+		print( "unknown command", sys.argv[ 1 ] )
 

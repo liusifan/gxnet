@@ -35,11 +35,12 @@ public:
 
 	static bool loadMnistImages( const int limitCount, const char * path, GX_DataMatrix * images );
 
-	static bool loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels );
+	static bool loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels, int maxClasses );
 
-	static void printMatrix( const char * tag, const GX_DataMatrix & data );
+	static void printMatrix( const char * tag, const GX_DataMatrix & data,
+			bool useSciFmt = true, bool colorMax = false);
 
-	static void printVector( const char * tag, const GX_DataVector & data );
+	static void printVector( const char * tag, const GX_DataVector & data, bool useSciFmt = true );
 
 	static void addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src );
 

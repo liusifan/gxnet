@@ -81,6 +81,17 @@ private:
 			int miniBatchCount, GX_DataType learningRate,
 			GX_DataType lambda, int trainingCount );
 
+	bool forwardInternal( const GX_DataVector & input,
+			GX_DataMatrix * output );
+
+private:
+
+	static void initGradMatrix( const GX_LayerPtrVector & layers,
+			GX_DataMatrix * miniBatchGrad, GX_DataMatrix * grad );
+
+	static void initOutputAndDeltaMatrix( const GX_LayerPtrVector & layers,
+			GX_DataMatrix * output, GX_DataMatrix * miniBatchDelta, GX_DataMatrix * delta );
+
 private:
 	GX_LayerPtrVector mLayers;
 	bool mIsDebug;

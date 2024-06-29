@@ -169,13 +169,26 @@ void GX_Network ::print()
 
 bool GX_Network :: forward( const GX_DataVector & input, GX_DataMatrix * output )
 {
+	assert( output->size() == 0 );
+
+	output->reserve( mLayers.size() );
+
+	for( auto & layer: mLayers ) {
+		output->push_back( GX_DataVector( layer->getNeurons().size(), 0 ) );
+	}
+
+	return forwardInternal( input, output );
+}
+
+bool GX_Network :: forwardInternal( const GX_DataVector & input, GX_DataMatrix * output )
+{
 	if( mLayers.size() <= 0 || mLayers[ 0 ]->getNeurons().size() <= 0 ) {
 		printf( "%s layers.size %zu, layer[0].size %zu\n",
 			__func__, mLayers.size(),  mLayers[ 0 ]->getNeurons().size() );
 		return false;
 	}
 
-	if( input.size() < mLayers[ 0 ]->getNeurons()[ 0 ]->getWeights().size() ) {
+	if( input.size() != mLayers[ 0 ]->getNeurons()[ 0 ]->getWeights().size() ) {
 		syslog( LOG_ERR, "%s input.size %zu, weights.size %zu",
 				__func__, input.size(), mLayers[ 0 ]->getNeurons()[ 0 ]->getWeights().size() );
 		printf( "%s input.size %zu, weights.size %zu\n",
@@ -185,18 +198,21 @@ bool GX_Network :: forward( const GX_DataVector & input, GX_DataMatrix * output 
 
 	const GX_DataVector * currInput = &input;
 
-	output->reserve( mLayers.size() );
+	assert( output->size() == mLayers.size() );
 
-	for( auto & layer : mLayers ) {
-		output->push_back( GX_DataVector() );
-		output->back().reserve( layer->getNeurons().size() );
+	for( size_t i = 0; i < mLayers.size(); i++ ) {
+		GX_Layer * layer = mLayers[ i ];
 
-		if( output->size() > 1 ) currInput = &( (*output)[ output->size() - 2 ] );
-		for( auto & neuron : layer->getNeurons() ) {
+		assert( ( *output )[ i ].size() == layer->getNeurons().size() );
+
+		if( i > 0 ) currInput = &( (*output)[ i - 1 ] );
+		for( size_t j = 0; j < layer->getNeurons().size(); j++ ) {
+			GX_Neuron * neuron = layer->getNeurons()[ j ];
+
 			GX_DataType netOutput = 0, tmpOutput = 0;
 			if( ! neuron->calcOutput( *currInput, mIsDebug, mIgnoreBias, &netOutput, &tmpOutput ) ) return false;
 
-			output->back().push_back( tmpOutput );
+			( *output )[ i ][ j ] = tmpOutput;
 		}
 	}
 
@@ -208,18 +224,14 @@ bool GX_Network :: backward( const GX_DataVector & target,
 {
 	const GX_DataVector & last = output.back();
 
-	delta->reserve( output.size() );
-	for( const auto & item : output ) {
-		delta->push_back( GX_DataVector() );
-		delta->reserve( item.size() );
-	}
+	assert( delta->size() == mLayers.size() );
 
 	GX_Layer * layer = mLayers.back();
 	for( size_t i = 0; i < layer->getNeurons().size(); i++ ) {
 		GX_DataType tmpError = 2 * ( last[ i ] - target[ i ] );
 		GX_DataType derivative = last[ i ] * ( 1 - last[ i ] );
 
-		delta->back().push_back( tmpError * derivative );
+		delta->back()[ i ] = tmpError * derivative;
 	}
 
 	for( int currLayer = mLayers.size() - 2; currLayer >= 0 ; currLayer-- ) {
@@ -234,7 +246,7 @@ bool GX_Network :: backward( const GX_DataVector & target,
 			for( size_t k = 0; k < nextLayerNeurons.size(); k++ ) {
 				tmpError += nextLayerNeurons[ k ]->getWeights()[ currNeuron ] * ( *delta )[ currLayer + 1 ][ k ];
 			}
-			( *delta )[ currLayer ].push_back( tmpError * derivative );
+			( *delta )[ currLayer ][ currNeuron ] = tmpError * derivative;
 		}
 	}
 
@@ -245,6 +257,8 @@ bool GX_Network :: collect( const GX_DataVector & input, const GX_DataMatrix & o
 			const GX_DataMatrix & delta, GX_DataMatrix * grad ) const
 {
 	const GX_DataVector * currInput = &input;
+
+	int gradIdx = 0;
 
 	for( size_t i = 0; i < mLayers.size(); i++ ) {
 		if( i > 0 ) currInput = &( output[ i - 1 ] );
@@ -257,12 +271,14 @@ bool GX_Network :: collect( const GX_DataVector & input, const GX_DataMatrix & o
 			GX_Neuron * neuron = layer->getNeurons()[ j ];
 			GX_DataVector & weights = neuron->getWeights();
 
-			grad->push_back( GX_DataVector() );
-			grad->reserve( layer->getNeurons().size() );
+			assert( grad->size() > gradIdx );
+
+			GX_DataVector & currGrad = ( *grad )[ gradIdx++ ];
+
+			assert( currGrad.size() == weights.size() );
 
 			for( size_t k = 0; k < weights.size(); k++ ) {
-				GX_DataType tmp = currDelta[ j ] * ( *currInput )[ k ];
-				grad->back().push_back( tmp );
+				currGrad[ k ] = currDelta[ j ] * ( *currInput )[ k ];
 			}
 		}
 	}
@@ -305,6 +321,44 @@ bool GX_Network :: apply( const GX_DataMatrix & delta, const GX_DataMatrix & gra
 	return true;
 }
 
+void GX_Network :: initGradMatrix( const GX_LayerPtrVector & layers,
+		GX_DataMatrix * miniBatchGrad, GX_DataMatrix * grad )
+{
+	assert( miniBatchGrad->size() == 0 );
+	assert( grad->size() == 0 );
+
+	int gradSize = 0;
+	for( auto & layer: layers ) gradSize += layer->getNeurons().size();
+
+	grad->reserve( gradSize );
+	miniBatchGrad->reserve( gradSize );
+
+	for( auto & layer: layers ) {
+		for( auto & neuron : layer->getNeurons() ) {
+			grad->push_back( GX_DataVector( neuron->getWeights().size(), 0 ) );
+			miniBatchGrad->push_back( GX_DataVector( neuron->getWeights().size(), 0 ) );
+		}
+	}
+}
+
+void GX_Network :: initOutputAndDeltaMatrix( const GX_LayerPtrVector & layers,
+		GX_DataMatrix * output, GX_DataMatrix * miniBatchDelta, GX_DataMatrix * delta )
+{
+	assert( output->size() == 0 );
+	assert( miniBatchDelta->size() == 0 );
+	assert( delta->size() == 0 );
+
+	output->reserve( layers.size() );
+	delta->reserve( layers.size() );
+	miniBatchDelta->reserve( layers.size() );
+
+	for( auto & layer: layers ) {
+		output->push_back( GX_DataVector( layer->getNeurons().size(), 0 ) );
+		delta->push_back( GX_DataVector( layer->getNeurons().size(), 0 ) );
+		miniBatchDelta->push_back( GX_DataVector( layer->getNeurons().size(), 0 ) );
+	}
+}
+
 bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & target,
 		int epochCount, GX_DataType learningRate, GX_DataType lambda )
 {
@@ -324,6 +378,12 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 
 	time_t beginTime = time( NULL );
 
+	GX_DataMatrix miniBatchGrad, grad;
+	initGradMatrix( mLayers, &miniBatchGrad, &grad );
+
+	GX_DataMatrix output, miniBatchDelta, delta;
+	initOutputAndDeltaMatrix( mLayers, &output, &miniBatchDelta, &delta );
+
 	for( int n = 0; n < epochCount; n++ ) {
 
 		std::vector< int > idxOfData( input.size() );
@@ -337,15 +397,15 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 		for( size_t begin = 0; begin < idxOfData.size(); ) {
 			size_t end = std::min( idxOfData.size(), begin + miniBatchCount );
 
-			GX_DataMatrix miniBatchDelta, miniBatchGrad;
+			for( auto & vec : miniBatchGrad ) vec.assign( vec.size(),0 );
+			for( auto & vec : miniBatchDelta ) vec.assign( vec.size(), 0 );
 
 			for( size_t i = begin; i < end; i++ ) {
-				GX_DataMatrix output, delta, grad;
 
 				const GX_DataVector & currInput = input[ idxOfData[ i ] ];
 				const GX_DataVector & currTarget = target[ idxOfData[ i ] ];
 
-				if( ! forward( currInput, &output ) ) return false;
+				if( ! forwardInternal( currInput, &output ) ) return false;
 
 				if( ! backward( currTarget, output, &delta ) ) return false;
 
