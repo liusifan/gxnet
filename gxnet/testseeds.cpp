@@ -142,8 +142,10 @@ void test( const CmdArgs_t & args )
 	{
 		GX_Network network;
 
-		network.addLayer( 5, input[ 0 ].size() );
-		network.addLayer( target[ 0 ].size(), 5 );
+		network.setLossFuncType( GX_Network::eCrossEntropy );
+
+		network.addLayer( 5, input[ 0 ].size(), GX_Layer::eSoftmax );
+		network.addLayer( target[ 0 ].size(), 5, GX_Layer::eSoftmax );
 
 		check( "before train", network, input4eval, target4eval, args.mIsDebug );
 
@@ -172,7 +174,7 @@ int main( const int argc, char * argv[] )
 		.mEvalCount = 42,
 		.mEpochCount = 10,
 		.mMiniBatchCount = 1,
-		.mLearningRate = 0.3,
+		.mLearningRate = 0.1,
 		.mIsDebug = false,
 		.mIsShuffle = true,
 	};

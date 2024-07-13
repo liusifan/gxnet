@@ -20,7 +20,7 @@ typedef struct tagCmdArgs {
 class GX_Utils {
 public:
 	template< class ForwardIt >
-	static int max_index( ForwardIt first, ForwardIt last )
+	static size_t max_index( ForwardIt first, ForwardIt last )
 	{
 		return std::distance( first, std::max_element( first, last ) );
 	}

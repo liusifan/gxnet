@@ -1,9 +1,13 @@
 
-CFLAGS = -std=c++11 -Wall -g -O3 -DNDEBUG
-#-Wall -Werror -g
-#-Wno-unused-result
+CFLAGS = -std=c++11 -Wall -Werror
 
-CPPFLAGS = $(CFLAGS) -Wno-invalid-offsetof
+ifeq ($(debug),1)
+CFLAGS += -g
+else
+CFLAGS += -O3 -DNDEBUG
+endif
+
+CPPFLAGS = $(CFLAGS)
 
 LDFLAGS = -lstdc++ -lm
 

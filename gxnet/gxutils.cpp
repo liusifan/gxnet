@@ -234,7 +234,7 @@ void GX_Utils :: printMatrix( const char * tag, const GX_DataMatrix & data,
 	for( size_t i = 0; i < data.size(); i++ ) {
 		printf( "#%ld ", i );
 
-		int idx = max_index( data[ i ].begin(), data[ i ].end() );
+		size_t idx = max_index( data[ i ].begin(), data[ i ].end() );
 
 		for( size_t j = 0; j < data[ i ].size(); j++ ) {
 			const char * fmt = "%.2f ";
@@ -267,18 +267,22 @@ bool GX_Utils :: save( const char * path, const GX_Network & network )
 
 	if( NULL == fp ) return false;
 
-	fprintf( fp, "Layers: %ld\n", network.getLayers().size() );
+	fprintf( fp, "Network: LayerCount = %ld, LossFuncType = %d\n",
+			network.getLayers().size(), network.getLossFuncType() );
 
 	for( size_t i = 0; i < network.getLayers().size(); i++ ) {
-		const GX_NeuronPtrVector & neurons = network.getLayers()[ i ]->getNeurons();
+		GX_Layer * layer = network.getLayers() [ i ];
 
-		fprintf( fp, "Layer#%ld: %ld\n", i, neurons.size() );
+		const GX_NeuronPtrVector & neurons = layer->getNeurons();
+
+		fprintf( fp, "Layer#%ld: NeuronCount = %ld, ActFuncType = %d\n",
+				i, neurons.size(), layer->getActFuncType() );
 
 		for( size_t j = 0; j < neurons.size(); j++ ) {
 			GX_Neuron * neuron = neurons[ j ];
 			const GX_DataVector & weights = neuron->getWeights();
 
-			fprintf( fp, "Neuron#%ld: %ld\n", j, weights.size() );
+			fprintf( fp, "Neuron#%ld: WeightCount = %ld\n", j , weights.size() );
 			fprintf( fp, "Bias#%ld: %e\n", j, neurons[ j ]->getBias() );
 
 			fprintf( fp, "Weights#%ld:\n\t", j );
@@ -297,41 +301,42 @@ bool GX_Utils :: save( const char * path, const GX_Network & network )
 
 bool GX_Utils :: load( const char * path, GX_Network * network )
 {
-	auto getNumber = []( std::string const & line ) {
-		const std::regex colon( ":" );
+	auto getNumber = []( std::string const & line, const char * fmt, double defaultValue ) {
+		double value = defaultValue;
 
-		std::vector< std::string > srow{
-			std::sregex_token_iterator( line.begin(), line.end(), colon, -1 ),
-			std::sregex_token_iterator() };
+		std::regex ex( fmt );
+		std::smatch match;
 
-		return srow.size() > 0 ? std::stod( srow[ 1 ] ) : 0;
+		if( std::regex_search( line, match, ex ) ) value = std::stod( match[ match.size() - 1 ] );
+
+		return value;
 	};
 
-	auto getNumberVector = []( std::string const & line, GX_DataVector * data ) {
-		const std::regex colon( "," );
+	auto getNumberVector = []( std::string const & line, std::string * prefix, GX_DataVector * data ) {
+		const std::regex comma( "," );
 
 		std::vector< std::string > srow{
-			std::sregex_token_iterator( line.begin(), line.end(), colon, -1 ),
+			std::sregex_token_iterator( line.begin(), line.end(), comma, -1 ),
 			std::sregex_token_iterator() };
 
-		data->reserve( srow.size() );
+		data->resize( srow.size() );
 		for( size_t i = 0; i < srow.size(); i++ ) {
 			( *data )[ i ] = std::stod( srow[ i ] );
 		}
 	};
 
-	const std::regex colon( ":" ), comma( "," );
-
 	std::ifstream fp( path );
 
 	if( !fp ) return false;
 
-	std::string line;
+	std::string line, name;
 
-	// Layers: xxx
+	// Network: xxx
 	if( ! std::getline( fp, line ) ) return false;
 
-	int layerCount = getNumber( line );
+	network->setLossFuncType( getNumber( line, "LossFuncType = (\\d+)", GX_Network::eMeanSquaredError ) );
+
+	int layerCount = getNumber( line, "LayerCount = (\\d+)", 0 );
 
 	network->getLayers().reserve( layerCount );
 
@@ -339,7 +344,8 @@ bool GX_Utils :: load( const char * path, GX_Network * network )
 		// Layer#x: xxx
 		if( ! std::getline( fp, line ) ) return false;
 
-		int neuronCount = getNumber( line );
+		int neuronCount = getNumber( line, "NeuronCount = (\\d+)", 0 );
+		int actFuncType = getNumber( line, "ActFuncType = (\\d+)", GX_Layer::eSigmoid );
 
 		GX_Layer * layer = NULL;
 
@@ -348,16 +354,16 @@ bool GX_Utils :: load( const char * path, GX_Network * network )
 			// Neuron#x: xxx
 			if( ! std::getline( fp, line ) ) return false;
 
-			int weightCount = getNumber( line );
+			int weightCount = getNumber( line, "WeightCount = (\\d+)", 0 );
 
-			if( NULL == layer )  layer = new GX_Layer( neuronCount, weightCount );
+			if( NULL == layer )  layer = new GX_Layer( neuronCount, weightCount, actFuncType );
 
 			GX_Neuron * neuron = layer->getNeurons()[ j ];
 
 			// Bias#x: xxx
 			if( ! std::getline( fp, line ) ) return false;
 
-			neuron->setBias( getNumber( line ) );
+			neuron->setBias( getNumber( line, ": (-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)", 0 ) );
 
 			// Weights#x: xxx:
 			if( ! std::getline( fp, line ) ) return false;
@@ -365,7 +371,7 @@ bool GX_Utils :: load( const char * path, GX_Network * network )
 			// xxx, xxx, xxx
 			if( ! std::getline( fp, line ) ) return false;
 
-			getNumberVector( line, &neuron->getWeights() );
+			getNumberVector( line, NULL, &neuron->getWeights() );
 		}
 
 		network->getLayers().push_back( layer );

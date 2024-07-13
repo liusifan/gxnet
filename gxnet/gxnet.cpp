@@ -39,43 +39,33 @@ void GX_Neuron :: setBias( GX_DataType bias )
 	mBias = bias;
 }
 
-bool GX_Neuron :: calcOutput( const GX_DataVector input, bool isDebug,
-		bool ignoreBias, GX_DataType * netOutput, GX_DataType * output )
+GX_DataType GX_Neuron :: calcOutput( const GX_DataVector & input, bool isDebug, bool ignoreBias )
 {
 	if( input.size() < mWeights.size() ) {
 		syslog( LOG_ERR, "%s input.size %zu mWeights.size %zu",
 				__func__, input.size(), mWeights.size() );
 		printf( "%s input.size %zu mWeights.size %zu\n",
 				__func__, input.size(), mWeights.size() );
-		return false;
 	}
 
-	*netOutput = ignoreBias ? 0 : mBias;
+	assert( input.size() == mWeights.size() );
 
-	for( size_t i = 0; i < mWeights.size(); i++ ) {
-		GX_DataType tmp = mWeights[ i ] * input[ i ];
+	GX_DataType ret = ignoreBias ? 0 : mBias;
 
-		//if( isDebug ) printf( "output %e = %e * %e\n", tmp, mWeights[ i ], input[ i ] );
+	ret += std::inner_product( input.begin(), input.end(), mWeights.begin(), 0.0 );
 
-		*netOutput += tmp;
-	}
-
-	//if( isDebug ) printf( "netOutput %e\n", *netOutput );
-
-	*output = 1.0f / ( 1.0f + std::exp( - ( *netOutput ) ) );
-
-	//if( isDebug ) printf( "output %e = 1.0 / ( 1.0 + std::exp( -1 * %e ) \n", *output, *netOutput );
-
-	return true;
+	return ret;
 }
 
 ////////////////////////////////////////////////////////////
 
-GX_Layer :: GX_Layer( const int neuronCount, const int weightCount )
+GX_Layer :: GX_Layer( const int neuronCount, const int weightCount, int actFuncType )
 {
 	for( int i = 0; i < neuronCount; i++ ) {
 		mNeurons.push_back( new GX_Neuron( weightCount ) );
 	}
+
+	mActFuncType = actFuncType;
 }
 
 GX_Layer :: ~GX_Layer()
@@ -88,13 +78,101 @@ GX_NeuronPtrVector & GX_Layer :: getNeurons()
 	return mNeurons;
 }
 
+int GX_Layer :: getActFuncType() const
+{
+	return mActFuncType;
+}
+
+void GX_Layer :: activate( GX_DataVector * output ) const
+{
+	if( GX_Layer::eSigmoid == mActFuncType ) {
+		for( auto & item : *output ) item = 1.0f / ( 1.0f + std::exp( -item ) );
+	}
+
+	if( GX_Layer::eReLU == mActFuncType ) {
+		for( auto & item : *output ) {
+			if( item < 0 ) {
+				item = 0.01 * item;
+			} else if( item > 1 ) {
+				item = 1 + 0.01 * ( item - 1 );
+			}
+		}
+	}
+
+	if( GX_Layer::eTanh == mActFuncType ) {
+		for( auto & item : *output ) item = std::tanh( item );
+	}
+
+	if( GX_Layer::eSoftmax == mActFuncType ) {
+		GX_DataType maxValue = *std::max_element( output->begin(), output->end() );
+
+		GX_DataType total = 0;
+		for( auto & item : *output ) {
+			item = std::exp( item - maxValue );
+			total += item;
+		}
+
+		for( auto & item : *output ) item = item / total;
+	}
+}
+
+void GX_Layer :: derivative( const GX_DataVector & output, const GX_DataVector & dOutput,
+		GX_DataVector * delta ) const
+{
+	assert( output.size() == delta->size() );
+
+	if( GX_Layer::eSigmoid == mActFuncType ) {
+		for( size_t i = 0; i < output.size(); i++ ) {
+			( *delta )[ i ] = output[ i ] * ( 1 - output[ i ] );
+			( *delta )[ i ] *= dOutput[ i ];
+		}
+	}
+
+	if( GX_Layer::eReLU == mActFuncType ) {
+		for( size_t i = 0; i < output.size(); i++ ) {
+			( *delta )[ i ] = output[ i ] < 0 || output[ i ] > 1 ? 0.01 : 1;
+			( *delta )[ i ] *= dOutput[ i ];
+		}
+	}
+
+	if( GX_Layer::eTanh == mActFuncType ) {
+		for( size_t i = 0; i < output.size(); i++ ) {
+			( *delta )[ i ] = 1 - output[ i ] * output[ i ];
+			( *delta )[ i ] *= dOutput[ i ];
+		}
+	}
+
+	if( GX_Layer::eSoftmax == mActFuncType ) {
+		for( size_t j = 0; j < output.size(); j++ ) {
+			GX_DataVector dSoftmax( output.size(), 0 );
+			for( size_t k = 0; k < output.size(); k++ ) {
+				dSoftmax[ k ] = ( k == j ) ? output[ j ] * ( 1.0 - output[ j ] ) : -output[ k ] * output[ j ];
+			}
+			( *delta )[ j ] = std::inner_product( dOutput.begin(), dOutput.end(), dSoftmax.begin(), 0.0 );
+		}
+	}
+}
+
+void GX_Layer :: calcOutput( const GX_DataVector & input, bool isDebug,
+		bool ignoreBias, GX_DataVector * output ) const
+{
+	assert( output->size() == mNeurons.size() );
+
+	for( size_t j = 0; j < mNeurons.size(); j++ ) {
+		( *output )[ j ] =  mNeurons[ j ]->calcOutput( input, isDebug, ignoreBias );
+	}
+
+	activate( output );
+}
+
 ////////////////////////////////////////////////////////////
 
-GX_Network :: GX_Network( bool isDebug, bool ignoreBias, bool isSumMiniBatchGrad )
+GX_Network :: GX_Network( int lossFuncType )
 {
-	mIsDebug = isDebug;
-	mIgnoreBias = ignoreBias;
-	mIsSumMiniBatchGrad = isSumMiniBatchGrad;
+	mLossFuncType = lossFuncType;
+
+	mIsDebug = false;
+	mIsDebugBackward = false;
 }
 
 GX_Network :: ~GX_Network()
@@ -102,18 +180,28 @@ GX_Network :: ~GX_Network()
 	for( auto & layer : mLayers ) delete layer;
 }
 
-bool GX_Network :: addLayer( const int neuronCount, const int weightCount )
+void GX_Network :: setDebug( bool flag )
+{
+	mIsDebug = flag;
+}
+
+void GX_Network :: setDebugBackward( bool flag )
+{
+	mIsDebugBackward = flag;
+}
+
+bool GX_Network :: addLayer( const int neuronCount, const int weightCount, int actFuncType )
 {
 	if( neuronCount <= 0 || weightCount <= 0 ) return false;
 
-	mLayers.push_back( new GX_Layer( neuronCount, weightCount ) );
+	mLayers.push_back( new GX_Layer( neuronCount, weightCount, actFuncType ) );
 
 	return true;
 }
 
-bool GX_Network :: addLayer( const GX_DataMatrix & weights, const GX_DataVector & bias )
+bool GX_Network :: addLayer( const GX_DataMatrix & weights, const GX_DataVector & bias, int actFuncType )
 {
-	GX_Layer * layer = new GX_Layer( weights.size(), weights[ 0 ].size() );
+	GX_Layer * layer = new GX_Layer( weights.size(), weights[ 0 ].size(), actFuncType );
 
 	for( size_t i = 0; i < weights.size(); i++ ) {
 		layer->getNeurons()[ i ]->getWeights() = weights[ i ];
@@ -123,6 +211,16 @@ bool GX_Network :: addLayer( const GX_DataMatrix & weights, const GX_DataVector 
 	mLayers.push_back( layer );
 
 	return true;
+}
+
+void GX_Network :: setLossFuncType( int lossFuncType )
+{
+	mLossFuncType = lossFuncType;
+}
+
+int GX_Network :: getLossFuncType() const
+{
+	return mLossFuncType;
 }
 
 const GX_LayerPtrVector & GX_Network ::getLayers() const
@@ -137,16 +235,17 @@ GX_LayerPtrVector & GX_Network ::getLayers()
 
 void GX_Network ::print()
 {
-	printf( "LayerCount: %zu\n", mLayers.size() );
+	printf( "Network: { %ld }, LossFuncType %d\n", mLayers.size(), mLossFuncType );
 	for( size_t i = 0; i < mLayers.size(); i++ ) {
 		GX_Layer * layer = mLayers[ i ];
 
-		printf( "Layer %ld: { %ld }\n", i, layer->getNeurons().size() );
+		printf( "Layer#%ld: { %ld }, ActFuncType %d\n",
+				i, layer->getNeurons().size(), layer->getActFuncType() );
 
 		for( size_t j = 0; j < layer->getNeurons().size(); j++ ) {
 			GX_Neuron * neuron = layer->getNeurons()[ j ];
 
-			printf( "\tNeuron %ld: { %ld }\n", j, neuron->getWeights().size() );
+			printf( "\tNeuron#%ld: { %ld }\n", j, neuron->getWeights().size() );
 
 			if( j > 10 ) {
 				printf( "\t\t......\n" );
@@ -156,7 +255,7 @@ void GX_Network ::print()
 			printf( "\t\tbias %.8f\n", neuron->getBias() );
 
 			for( size_t k = 0; k < neuron->getWeights().size(); k++ ) {
-				printf( "\t\tWeight %ld: %.8f\n", k, neuron->getWeights()[ k ] );
+				printf( "\t\tWeight#%ld: %.8f\n", k, neuron->getWeights()[ k ] );
 
 				if( k > 10 ) {
 					printf( "\t\t......\n" );
@@ -203,51 +302,80 @@ bool GX_Network :: forwardInternal( const GX_DataVector & input, GX_DataMatrix *
 	for( size_t i = 0; i < mLayers.size(); i++ ) {
 		GX_Layer * layer = mLayers[ i ];
 
-		assert( ( *output )[ i ].size() == layer->getNeurons().size() );
-
 		if( i > 0 ) currInput = &( (*output)[ i - 1 ] );
-		for( size_t j = 0; j < layer->getNeurons().size(); j++ ) {
-			GX_Neuron * neuron = layer->getNeurons()[ j ];
 
-			GX_DataType netOutput = 0, tmpOutput = 0;
-			if( ! neuron->calcOutput( *currInput, mIsDebug, mIgnoreBias, &netOutput, &tmpOutput ) ) return false;
-
-			( *output )[ i ][ j ] = tmpOutput;
-		}
+		layer->calcOutput( *currInput, mIsDebug, mIsDebugBackward, &( ( *output )[ i ] ) );
 	}
 
 	return true;
 }
 
+GX_DataType GX_Network :: calcLoss( const GX_DataVector & target, const GX_DataVector & output )
+{
+	GX_DataType	ret = 0;
+
+	if( eMeanSquaredError == mLossFuncType ) {
+		ret = GX_Utils::calcSSE( output, target );
+	}
+
+	if( eCrossEntropy == mLossFuncType ) {
+		for( size_t x = 0; x < target.size(); x++ ) {
+			GX_DataType y = target[ x ], a = output[ x ];
+			GX_DataType tmp = y * std::log( a ); // + ( 1 - y ) * std::log( 1 - a );
+			ret -= tmp;
+		}
+	}
+
+	return ret;
+}
+
+void GX_Network :: calcOutputDelta( const GX_Layer & layer, const GX_DataVector & target,
+		const GX_DataVector & output, GX_DataVector * delta )
+{
+	assert( target.size() == output.size() );
+
+	if( eMeanSquaredError == mLossFuncType ) {
+
+		GX_DataVector dOutput( target.size(), 0 );
+		for( size_t i = 0; i < target.size(); i++ ) {
+			dOutput[ i ] = 2 * ( output[ i ] - target[ i ] );
+		}
+
+		layer.derivative( output, dOutput, delta );
+	}
+
+	if( eCrossEntropy == mLossFuncType ) {
+		for( size_t i = 0; i < target.size(); i++ ) {
+			( *delta )[ i ] = output[ i ] - target[ i ];
+		}
+	}
+}
+
 bool GX_Network :: backward( const GX_DataVector & target,
 		const GX_DataMatrix & output, GX_DataMatrix * delta )
 {
-	const GX_DataVector & last = output.back();
+	const GX_DataVector & lastOutput = output.back();
 
 	assert( delta->size() == mLayers.size() );
 
 	GX_Layer * layer = mLayers.back();
-	for( size_t i = 0; i < layer->getNeurons().size(); i++ ) {
-		GX_DataType tmpError = 2 * ( last[ i ] - target[ i ] );
-		GX_DataType derivative = last[ i ] * ( 1 - last[ i ] );
 
-		delta->back()[ i ] = tmpError * derivative;
-	}
+	calcOutputDelta( *layer, target, lastOutput, &( delta->back() ) );
 
 	for( int currLayer = mLayers.size() - 2; currLayer >= 0 ; currLayer-- ) {
 		layer = mLayers[ currLayer ];
 
+		GX_DataVector dOutput( layer->getNeurons().size(), 0 );
 		for( size_t currNeuron = 0; currNeuron < layer->getNeurons().size(); currNeuron++ ) {
-			GX_DataType derivative = output[ currLayer ][ currNeuron ] * ( 1 - output[ currLayer ][ currNeuron ] );
-
-			GX_DataType tmpError = 0;
-
+			GX_DataType nextLayerDelta = 0;
 			GX_NeuronPtrVector & nextLayerNeurons = mLayers[ currLayer + 1 ]->getNeurons();
 			for( size_t k = 0; k < nextLayerNeurons.size(); k++ ) {
-				tmpError += nextLayerNeurons[ k ]->getWeights()[ currNeuron ] * ( *delta )[ currLayer + 1 ][ k ];
+				nextLayerDelta += nextLayerNeurons[ k ]->getWeights()[ currNeuron ] * ( *delta )[ currLayer + 1 ][ k ];
 			}
-			( *delta )[ currLayer ][ currNeuron ] = tmpError * derivative;
+			dOutput[ currNeuron ] = nextLayerDelta;
 		}
+
+		layer->derivative( output[ currLayer ], dOutput, &( ( *delta )[ currLayer ] ) );
 	}
 
 	return true;
@@ -308,11 +436,16 @@ bool GX_Network :: apply( const GX_DataMatrix & delta, const GX_DataMatrix & gra
 			GX_DataVector & weights = neuron->getWeights();
 
 			for( size_t k = 0; k < weights.size(); k++ ) {
-				weights[ k ] = ( 1 - learningRate * lambda / trainingCount ) * weights[ k ] 
-						- ( grad[ gradIdx ] )[ k ] * learningRate / miniBatchCount;
+				if( mIsDebugBackward ) {
+					weights[ k ] = weights[ k ] - grad[ gradIdx ][ k ] * learningRate;
+				} else {
+					weights[ k ] = ( 1 - learningRate * lambda / trainingCount ) * weights[ k ] 
+							- ( grad[ gradIdx ] )[ k ] * learningRate / miniBatchCount;
+				}
 			}
 
-			neuron->setBias( neuron->getBias() - learningRate * currDelta[ j ] / miniBatchCount );
+			if( ! mIsDebugBackward )
+				neuron->setBias( neuron->getBias() - learningRate * currDelta[ j ] / miniBatchCount );
 
 			gradIdx++;
 		}
@@ -360,14 +493,14 @@ void GX_Network :: initOutputAndDeltaMatrix( const GX_LayerPtrVector & layers,
 }
 
 bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & target,
-		int epochCount, GX_DataType learningRate, GX_DataType lambda )
+		int epochCount, GX_DataType learningRate, GX_DataType lambda, GX_DataVector * losses )
 {
-	return train( input, target, false, epochCount, 1, learningRate, lambda );
+	return train( input, target, false, epochCount, 1, learningRate, lambda, losses );
 }
 
 bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & target,
 		bool isShuffle, int epochCount, int miniBatchCount, GX_DataType learningRate,
-		GX_DataType lambda )
+		GX_DataType lambda, GX_DataVector * losses )
 {
 	if( input.size() != target.size() ) return false;
 
@@ -393,7 +526,7 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 		std::iota( idxOfData.begin(), idxOfData.end(), 0 );
 		if( isShuffle ) std::shuffle( idxOfData.begin(), idxOfData.end(), gen );
 
-		GX_DataType totalError = 0;
+		GX_DataType totalLoss = 0;
 
 		miniBatchCount = std::max( miniBatchCount, 1 );
 
@@ -417,24 +550,28 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 				GX_Utils::addMatrix( &miniBatchDelta, delta );
 				GX_Utils::addMatrix( &miniBatchGrad, grad );
 
-				GX_DataType sse = GX_Utils::calcSSE( output.back(), currTarget );
+				GX_DataType loss = calcLoss( currTarget, output.back() );
 
-				totalError += sse;
+				totalLoss += loss;
 
-				if( mIsDebug )  printf( "DEBUG: input #%ld sse %.8f totalError %.8f\n", i, sse, totalError );
+				if( mIsDebug )  printf( "DEBUG: input #%ld loss %.8f totalLoss %.8f\n", i, loss, totalLoss );
 			}
 
-			if( ! apply( miniBatchDelta, miniBatchGrad, mIsSumMiniBatchGrad ? 1 : ( end - begin ),
+			if( mIsDebug ) GX_Utils::printMatrix( "batch grad", miniBatchGrad );
+
+			if( ! apply( miniBatchDelta, miniBatchGrad, end - begin,
 					learningRate, lambda, input.size() ) ) return false;
 
 			begin += miniBatchCount;
 			end = begin + miniBatchCount;
 		}
 
+		if( NULL != losses ) losses->push_back( totalLoss / input.size() );
+
 		if( logInterval <= 1 || ( logInterval > 1 && 0 == n % logInterval ) || n == ( epochCount - 1 ) ) {
 			time_t currTime = time( NULL );
-			printf( "%s\tinterval %ld [>] epoch %d, lr %f, error %.8f\n",
-				ctime( &currTime ), currTime - beginTime, n, learningRate, totalError );
+			printf( "%s\tinterval %ld [>] epoch %d, lr %f, loss %.8f\n",
+				ctime( &currTime ), currTime - beginTime, n, learningRate, totalLoss / input.size() );
 			beginTime = time( NULL );
 		}
 

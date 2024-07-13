@@ -22,8 +22,7 @@ public:
 	const GX_DataType getBias();
 	void setBias( GX_DataType bias );
 
-	bool calcOutput( const GX_DataVector input, bool isDebug,
-			bool ignoreBias, GX_DataType * netOutput, GX_DataType * output );
+	GX_DataType calcOutput( const GX_DataVector & input, bool isDebug, bool ignoreBias );
 
 private:
 	GX_DataType mBias;
@@ -33,25 +32,50 @@ private:
 
 class GX_Layer {
 public:
-	GX_Layer( const int neuronCount, const int weightCount );
+	enum { eSigmoid, eReLU, eTanh, eSoftmax };
+
+public:
+	GX_Layer( const int neuronCount, const int weightCount, int actFuncType );
 	~GX_Layer();
 
 	GX_NeuronPtrVector & getNeurons();
 
+	int getActFuncType() const;
+
+	void calcOutput( const GX_DataVector & input, bool isDebug,
+			bool ignoreBias, GX_DataVector * output ) const;
+
+	void derivative( const GX_DataVector & output, const GX_DataVector & dOutput,
+			GX_DataVector * delta ) const;
+
+private:
+	void activate( GX_DataVector * output ) const;
+
 private:
 	GX_NeuronPtrVector mNeurons;
+	int mActFuncType;
 };
 
 class GX_Network {
 public:
-	GX_Network( bool isDebug = false,
-			bool ignoreBias = false,
-			bool isSumMiniBatchGrad = false );
+	enum { eMeanSquaredError, eCrossEntropy };
+
+public:
+	GX_Network( int costFuncType = eMeanSquaredError );
+
 	~GX_Network();
 
-	bool addLayer( const int neuronCount, const int weightCount );
+	void setDebug( bool flag );
 
-	bool addLayer( const GX_DataMatrix & weights, const GX_DataVector & bias );
+	void setDebugBackward( bool flag );
+
+	bool addLayer( const int neuronCount, const int weightCount, int actFuncType = GX_Layer::eSigmoid );
+
+	bool addLayer( const GX_DataMatrix & weights, const GX_DataVector & bias, int actFuncType = GX_Layer::eSigmoid );
+
+	void setLossFuncType( int lossFuncType );
+
+	int getLossFuncType() const;
 
 	GX_LayerPtrVector & getLayers();
 
@@ -64,11 +88,12 @@ public:
 			const GX_DataMatrix & output, GX_DataMatrix * delta );
 
 	bool train( const GX_DataMatrix & input, const GX_DataMatrix & target,
-			int epochCount, GX_DataType learningRate, GX_DataType lambda = 0 );
+			int epochCount, GX_DataType learningRate, GX_DataType lambda = 0,
+			GX_DataVector * losses = nullptr );
 
 	bool train( const GX_DataMatrix & input, const GX_DataMatrix & target,
 			bool isShuffle, int epochCount, int miniBatchCount,
-			GX_DataType learningRate, GX_DataType lambda = 0 );
+			GX_DataType learningRate, GX_DataType lambda = 0, GX_DataVector * losses = nullptr );
 
 	void print();
 
@@ -84,6 +109,11 @@ private:
 	bool forwardInternal( const GX_DataVector & input,
 			GX_DataMatrix * output );
 
+	void calcOutputDelta( const GX_Layer & layer, const GX_DataVector & target,
+			const GX_DataVector & output, GX_DataVector * delta );
+
+	GX_DataType calcLoss( const GX_DataVector & target, const GX_DataVector & output );
+
 private:
 
 	static void initGradMatrix( const GX_LayerPtrVector & layers,
@@ -93,9 +123,9 @@ private:
 			GX_DataMatrix * output, GX_DataMatrix * miniBatchDelta, GX_DataMatrix * delta );
 
 private:
+	int mLossFuncType;
 	GX_LayerPtrVector mLayers;
 	bool mIsDebug;
-	bool mIgnoreBias;
-	bool mIsSumMiniBatchGrad; // use for debug
+	bool mIsDebugBackward;
 };
 

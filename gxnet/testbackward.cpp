@@ -27,6 +27,74 @@ void check( const char * tag, GX_Network & network, GX_DataVector & input, GX_Da
 	printf( "sse %.8f\n", sse );
 }
 
+const char * GRAD_EXAMPLES =
+R"(
+input { 2 }
+3.00000000e+00 1.00000000e+00 
+
+grad { 4 }
+#0 -5.343815e-08 -1.781272e-08 
+#1 1.420144e-03 4.733812e-04 
+#2 -1.051877e-01 -1.891928e-03 
+#3 2.654905e-02 4.775168e-04 
+
+input { 2 }
+-1.00000000e+00 4.00000000e+00 
+
+grad { 4 }
+#0 -2.717464e-07 1.086986e-06 
+#1 -1.962391e-12 7.849563e-12 
+#2 2.301185e-07 2.767417e-01 
+#3 -2.081411e-08 -2.503115e-02 
+
+batch grad { 4 }
+#0 -3.251846e-07 1.069173e-06 
+#1 1.420144e-03 4.733812e-04 
+#2 -1.051875e-01 2.748497e-01 
+#3 2.654902e-02 -2.455364e-02 
+
+('g_W', array([[-3.25184585e-07,  1.42014367e-03],
+       [ 1.06917303e-06,  4.73381232e-04]]))
+('g_V', array([[-0.10518746,  0.02654902],
+       [ 0.27484974, -0.02455364]]))
+
+)";
+
+const char * TRAIN_EXAMPLES =
+R"(
+Network: { 2 }, LossFuncType 0
+Layer#0: { 2 }, ActFuncType 0
+	Neuron#0: { 2 }
+		bias 0.00000000
+		Weight#0: 6.00000016
+		Weight#1: -2.00000053
+	Neuron#1: { 2 }
+		bias 0.00000000
+		Weight#0: -3.00071007
+		Weight#1: 4.99976331
+Layer#1: { 2 }, ActFuncType 0
+	Neuron#0: { 2 }
+		bias 0.00000000
+		Weight#0: 1.05259373
+		Weight#1: 0.11257513
+	Neuron#1: { 2 }
+		bias 0.00000000
+		Weight#0: -2.01327451
+		Weight#1: 2.01227682
+forward 1, input { 2 }, output { 2 }
+layer 0
+	0.99999989 	0.01794445 
+layer 1
+	0.74165987 	0.12162137 
+sse 0.08153138
+
+('net.V', array([[ 1.05259373, -2.01327451],
+       [ 0.11257513,  2.01227682]]))
+('net.W', array([[ 6.00000016, -3.00071007],
+       [-2.00000053,  4.99976331]]))
+('y', array([[0.74165987, 0.12162137]]))
+)";
+
 void testBackward()
 {
 	//https://alexander-schiendorfer.github.io/2020/02/24/a-worked-example-of-backprop.html
@@ -40,14 +108,23 @@ void testBackward()
 
 	GX_DataType learningRate = 0.5;
 
-	GX_Network network( true, true, true );
+	GX_Network network( GX_Network::eMeanSquaredError );
+
+	network.setDebug( true );
+	network.setDebugBackward( true );
 
 	network.addLayer( v, b );
 	network.addLayer( w, b );
 
 	check( "before train", network, input[ 0 ], target[ 0 ] );
-	network.train( input, target, true, 1, 2, learningRate );
+
+	printf( "\e[0;31m%s\e[0m\n", GRAD_EXAMPLES );
+
+	network.train( input, target, false, 1, 2, learningRate );
+
 	check( "after train", network, input[ 0 ], target[ 0 ] );
+
+	printf( "\e[0;31m%s\e[0m\n", TRAIN_EXAMPLES );
 }
 
 int main()

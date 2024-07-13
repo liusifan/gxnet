@@ -140,6 +140,8 @@ void test( const CmdArgs_t & args )
 	{
 		GX_Network network;
 
+		//network.setLossFuncType( GX_Network::eCrossEntropy );
+
 		if( NULL != args.mModelPath && 0 == access( args.mModelPath, F_OK ) ) {
 			if(  GX_Utils::load( args.mModelPath, &network ) ) {
 				printf( "continue training %s\n", args.mModelPath );
@@ -148,8 +150,8 @@ void test( const CmdArgs_t & args )
 				return;
 			}
 		} else {
-			network.addLayer( 100, input[ 0 ].size() );
-			network.addLayer( target[ 0 ].size(), 100 );
+			network.addLayer( 30, input[ 0 ].size() );
+			network.addLayer( target[ 0 ].size(), 30 );
 		}
 
 		check( "before train", network, input4eval, target4eval, args.mIsDebug );
