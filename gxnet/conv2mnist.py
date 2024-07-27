@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
 	data = conv2mnist( sys.argv[ 1 ] )
 
-	if len( sys.argv ) > 1:
+	if len( sys.argv ) > 2:
 		for i in range( 0, MNIST_SIZE ):
 			for j in range( 0, MNIST_SIZE ):
 				if data[ i * MNIST_SIZE + j ] == 0 : print( "0", end="" )
