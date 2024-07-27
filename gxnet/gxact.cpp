@@ -77,9 +77,7 @@ void GX_ActFunc :: derivate( const GX_DataVector & output, GX_DataVector * outDe
 	}
 
 	if( eTanh == mType ) {
-		for( size_t i = 0; i < output.size(); i++ ) {
-			( *outDelta )[ i ] = ( *outDelta )[ i ] * ( 1 - output[ i ] * output[ i ] );
-		}
+		*outDelta = ( *outDelta ) * ( 1 - output * output );
 	}
 
 	if( eSoftmax == mType ) {

@@ -46,15 +46,12 @@ void GX_Utils :: addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src )
 	assert( dest->size() == src.size() );
 
 	for( size_t i = 0; i < src.size(); i++ ) {
-
 		GX_DataVector & destVec = dest->at( i );
 		const GX_DataVector & srcVec = src[ i ];
 
 		assert( destVec.size() == srcVec.size() );
 
-		for( size_t j = 0; j < srcVec.size(); j++ ) {
-			destVec[ j ] += srcVec[ j ];
-		}
+		destVec += srcVec;
 	}
 }
 
