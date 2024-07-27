@@ -14,12 +14,12 @@ then
 	python trans_mnist.py rotate $train_images $train_labels
 fi
 
-./testmnist -l 5
+time ./testmnist -l 5
 
 sh testuat.sh uat mnist.model mnist
 sh testuat.sh uat/ian mnist.model mnist
 
-./testmnist -l 2 -p mnist.model
+time ./testmnist -l 2 -p mnist.model
 
 sh testuat.sh uat mnist.model mnist
 sh testuat.sh uat/ian mnist.model mnist

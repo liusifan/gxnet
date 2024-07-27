@@ -42,8 +42,8 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 			return;
 		}
 
-		int outputType = GX_Utils::max_index( output.back().begin(), output.back().end() );
-		int targetType = GX_Utils::max_index( target[ i ].begin(), target[ i ].end() );
+		int outputType = GX_Utils::max_index( std::begin( output.back() ), std::end( output.back() ) );
+		int targetType = GX_Utils::max_index( std::begin( target[ i ] ), std::end( target[ i ] ) );
 
 		if( isDebug ) printf( "forward %d, index %zu, %d %d\n", ret, i, outputType, targetType );
 

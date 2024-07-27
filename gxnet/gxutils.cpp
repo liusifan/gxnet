@@ -167,10 +167,9 @@ bool GX_Utils :: loadMnistImages( const int limitCount, const char * path, GX_Da
 			break;
 		}
 
-		images->push_back( GX_DataVector() );
-		images->back().reserve( imageSize );
+		images->push_back( GX_DataVector( imageSize ) );
 		for( int j = 0; j < imageSize; j++ ) {
-			images->back().push_back( buff[ j ] / 255.0 );
+			images->back()[ j ] = buff[ j ] / 255.0;
 		}
 	}
 	free( buff );
@@ -217,8 +216,7 @@ bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatr
 			break;
 		}
 
-		labels->push_back( GX_DataVector() );
-		labels->back().resize( maxClasses, 0 );
+		labels->push_back( GX_DataVector( maxClasses ) );
 		labels->back()[ buff ] = 1;
 	}
 
@@ -234,12 +232,12 @@ void GX_Utils :: printMatrix( const char * tag, const GX_DataMatrix & data,
 	for( size_t i = 0; i < data.size(); i++ ) {
 		printf( "#%ld ", i );
 
-		size_t idx = max_index( data[ i ].begin(), data[ i ].end() );
+		GX_DataType maxValue = *std::max_element( std::begin( data[ i ] ), std::end( data[ i ] ) );
 
 		for( size_t j = 0; j < data[ i ].size(); j++ ) {
 			const char * fmt = "%.2f ";
 
-			if( colorMax && j == idx ) {
+			if( colorMax && data[ i ][ j ] == maxValue ) {
 				fmt = useSciFmt ? "\e[1;31m%8e\e[0m " : "\e[1;31m%.2f\e[0m ";
 			} else {
 				fmt = useSciFmt ? "%8e " : "%.2f ";

@@ -1,9 +1,18 @@
 #pragma once
 
 #include <vector>
+#include <valarray>
+
+#define GX_USE_VALARRAY
 
 typedef double GX_DataType;
+
+#ifdef GX_USE_VALARRAY
+typedef std::valarray< GX_DataType > GX_DataVector;
+#else
 typedef std::vector< GX_DataType > GX_DataVector;
+#endif
+
 typedef std::vector< GX_DataVector > GX_DataMatrix;
 
 class GX_Neuron;

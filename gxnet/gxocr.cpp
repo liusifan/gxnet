@@ -70,7 +70,7 @@ int test( const char * modelFile, const char * imgFile )
 		return -1;
 	}
 
-	int result = GX_Utils::max_index( output.back().begin(), output.back().end() );
+	int result = GX_Utils::max_index( std::begin( output.back() ), std::end( output.back() ) );
 
 	printf( "%s    \t-> %d, nn.output %f\n", imgFile, result, output.back()[ result ] );
 

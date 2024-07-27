@@ -32,16 +32,17 @@ bool loadData( const char * filename, GX_DataMatrix * data, std::set< int > * la
 			std::sregex_token_iterator( line.begin(), line.end(), comma, -1 ),
 			std::sregex_token_iterator() };
 
-		data->push_back( GX_DataVector() );
-		data->back().resize( srow.size(), 0 );
+		data->push_back( GX_DataVector( srow.size() ) );
 
-		std::transform( srow.begin(), srow.end(), data->back().begin(),
+		std::transform( srow.begin(), srow.end(), std::begin( data->back() ),
 				[](std::string const& val) {return std::stof(val); } );
 
 		labels->insert( std::stoi( srow.back() ) );
 	}
 
-	GX_DataVector min( data[ 0 ].size(), FLT_MAX ), max( data[ 0 ].size(), FLT_MIN );;
+	GX_DataVector min, max;
+	min.resize( data[ 0 ].size(), FLT_MAX );
+	max.resize( data[ 0 ].size(), FLT_MIN );
 
 	// normalize data
 	{
@@ -75,8 +76,8 @@ void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_Da
 
 		bool ret = network.forward( input[ i ], &output );
 
-		int outputType = GX_Utils::max_index( output.back().begin(), output.back().end() );
-		int targetType = GX_Utils::max_index( target[ i ].begin(), target[ i ].end() );
+		int outputType = GX_Utils::max_index( std::begin( output.back() ), std::end( output.back() ) );
+		int targetType = GX_Utils::max_index( std::begin( target[ i ] ), std::end( target[ i ] ) );
 
 		if( isDebug ) printf( "forward %d, index %zu, %d %d\n", ret, i, outputType, targetType );
 
@@ -103,23 +104,30 @@ void splitData( const CmdArgs_t & args, const GX_DataMatrix & data, const std::s
 	for( int i = args.mEvalCount; i > 0; i-- ) {
 		int n = std::rand() % idxOfData.size();
 
-		input4eval->push_back( data[ idxOfData[ n ] ] );
-		input4eval->back().pop_back(); // remove last element, it's the label
-		
+		const GX_DataVector & item = data[ idxOfData[ n ] ];
+
+		// remove last element, it's the label
+		input4eval->push_back( GX_DataVector( item.size() - 1 ) );
+		std::copy( std::begin( item ), std::end( item ) - 1, std::begin( input4eval->back() ) );
+
 		target4eval->push_back( GX_DataVector() );
 		target4eval->back().resize( mapOflabels.size(), 0 );
-		target4eval->back()[ mapOflabels[ data[ idxOfData[ n ] ].back() ] ] = 1;
+		target4eval->back()[ mapOflabels[ item[ item.size() - 1 ] ] ] = 1;
 
 		idxOfData.erase( idxOfData.begin() + n );
 	}
 
 	for( size_t i = 0; i < idxOfData.size(); i++ ) {
-		input->push_back( data[ idxOfData[ i ] ] );
-		input->back().pop_back(); // remove last element, it's the label
+
+		const GX_DataVector & item = data[ idxOfData[ i ] ];
+
+		// remove last element, it's the label
+		input->push_back( GX_DataVector( item.size() - 1 ) );
+		std::copy( std::begin( item ), std::end( item ) - 1, std::begin( input->back() ) );
 
 		target->push_back( GX_DataVector() );
 		target->back().resize( mapOflabels.size(), 0 );
-		target->back()[ mapOflabels[ data[ idxOfData[ i ] ].back() ] ] = 1;
+		target->back()[ mapOflabels[ item[ item.size() - 1 ] ] ] = 1;
 	}
 }
 
