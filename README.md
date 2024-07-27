@@ -48,7 +48,7 @@ sh launch_mnist.sh
 还有一点，就是用 [std::valarray](https://en.cppreference.com/w/cpp/numeric/valarray) 替代了 std::vector，在部分合适的场景下，用 valarray 的批量计算能力可以提升性能。在开始下面的工作之前，对代码打了 v0.1 的 tag 。
 
 ## 实现卷积层和池化层
-想进一步尝试 [EMNIST](https://www.nist.gov/itl/products-and-services/emnist-dataset) 数据集，里面包含了英文字母和数字，只是用全连接层效果很差，因此想用卷积神经网络来实现。实现过程中，主要的问题也是在验证实现的正确性上面，这次使用了 [pytorch](cnn/testconv.py) 来作为参考对照。另外的问题就是需要一些技巧来简化代码实现，一个是 ActFunc/Layer/Network 的分层设计，一个是借鉴 C++23 里面的 [std::mdspan](https://en.cppreference.com/w/cpp/container/mdspan) 把一维数组映射为多维数组（没有直接使用 mdspan，是希望本项目保持用 C++11）。
+想进一步尝试 [EMNIST](https://www.nist.gov/itl/products-and-services/emnist-dataset) 数据集，里面包含了英文字母和数字，只是用全连接层效果很差，因此想用卷积神经网络来实现。实现过程中，主要的问题也是在验证实现的正确性上面，这次使用了 [pytorch](pytorch/testconv.py) 来作为参考对照。另外的问题就是需要一些技巧来简化代码实现，一个是 ActFunc/Layer/Network 的分层设计，一个是借鉴 C++23 里面的 [std::mdspan](https://en.cppreference.com/w/cpp/container/mdspan) 把一维数组映射为多维数组（没有直接使用 mdspan，是希望本项目保持用 C++11）。
 
 [to be continued]
 
