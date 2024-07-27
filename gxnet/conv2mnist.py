@@ -82,15 +82,16 @@ def conv2mnist( path ):
 if __name__ == '__main__':
 
 	if( len( sys.argv ) < 2 ):
-		print( "Usage: %s <img file>\n" % ( sys.argv[ 0 ] ) )
+		print( "Usage: %s <img file> <verbose>\n" % ( sys.argv[ 0 ] ) )
 		sys.exit( -1 )
 
 	data = conv2mnist( sys.argv[ 1 ] )
 
-	for i in range( 0, 28 ):
-		for j in range( 0, 28 ):
-			if data[ i * 28 + j ] == 0 : print( "0", end="" )
-			else: print( "1", end="" )
-		print( "" )
+	if len( sys.argv ) > 2:
+		for i in range( 0, 28 ):
+			for j in range( 0, 28 ):
+				if data[ i * 28 + j ] == 0 : print( "0", end="" )
+				else: print( "1", end="" )
+			print( "" )
 
 
