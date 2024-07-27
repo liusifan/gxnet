@@ -1,5 +1,7 @@
 
 #include "gxutils.h"
+#include "gxnet.h"
+#include "gxact.h"
 
 #include <iostream>
 #include <fstream>
@@ -9,6 +11,7 @@
 #include <random>
 #include <numeric>
 #include <climits>
+#include <algorithm>
 
 #include <unistd.h>
 #include <assert.h>
@@ -120,6 +123,21 @@ bool GX_Utils :: centerMnistImage( GX_DataVector & orgImage, GX_DataVector * new
 		}
 
 		ret = true;
+	}
+
+	return ret;
+}
+
+bool GX_Utils :: expandMnistImage( GX_DataVector & orgImage, GX_DataVector * newImage )
+{
+	bool ret = true;
+
+	newImage->resize( 32 * 32, 0 );
+
+	for( int x = 0; x < 28; x++ ) {
+		for( int y = 0; y < 28; y++ ) {
+			( *newImage )[ ( x + 2 ) * 28 + y + 2 ] = orgImage[ x * 28 + y ];
+		}
 	}
 
 	return ret;
@@ -250,6 +268,45 @@ void GX_Utils :: printMatrix( const char * tag, const GX_DataMatrix & data,
 	}
 }
 
+void GX_Utils :: printVector( const char * tag, const GX_DataVector & data, const GX_Dims & dims, bool useSciFmt )
+{
+	GX_MDSpanRO ms( data, dims );
+
+	printMDSpan( tag, ms, useSciFmt );
+}
+
+void GX_Utils :: printMDSpan( const char * tag, const GX_MDSpanRO & data, bool useSciFmt )
+{
+	GX_Dims dims( std::max( size_t(4), data.dims().size() ), 1 );
+
+	std::copy( data.dims().rbegin(), data.dims().rend(), dims.rbegin() );
+
+	printf( "{{{\n\n" );
+	printf( "%s dims %zu { %zu, %zu, %zu, %zu }\n\n", tag, data.dims().size(), dims[ 0 ], dims[ 1 ], dims[ 2 ], dims[ 3 ] );
+
+	for( size_t f = 0; f < dims[ 0 ]; f++ ) {
+		if( dims[ 0 ] > 1 ) printf( "%s#%zu\n", tag, f );
+		for( size_t c = 0; c < dims[ 1 ]; c++ ) {
+			if( dims[ 1 ] > 1 ) printf( "%s#%zu\n", tag, c );
+			for( size_t x = 0; x < dims[ 2 ]; x++ ) {
+				for( size_t y = 0; y < dims[ 3 ]; y++ ) {
+					GX_DataType value = 0;
+					if( data.dims().size() == 1 ) value = data( y );
+					if( data.dims().size() == 2 ) value = data( x, y );
+					if( data.dims().size() == 3 ) value = data( c, x, y );
+					if( data.dims().size() == 4 ) value = data( f, c, x, y );
+
+					printf( useSciFmt ? "%.8e " : "%.2f ", value );
+				}
+				printf( "\n" );
+			}
+			printf( "\n" );
+		}
+		printf( "\n" );
+	}
+	printf( "}}}\n\n" );
+}
+
 void GX_Utils :: printVector( const char * tag, const GX_DataVector & data, bool useSciFmt )
 {
 	printf( "%s { %ld }\n", tag, data.size() );
@@ -265,30 +322,38 @@ bool GX_Utils :: save( const char * path, const GX_Network & network )
 
 	if( NULL == fp ) return false;
 
-	fprintf( fp, "Network: LayerCount = %ld, LossFuncType = %d\n",
+	fprintf( fp, "Network: LayerCount = %ld; LossFuncType = %d;\n",
 			network.getLayers().size(), network.getLossFuncType() );
 
 	for( size_t i = 0; i < network.getLayers().size(); i++ ) {
-		GX_Layer * layer = network.getLayers() [ i ];
+		GX_BaseLayer * layer = network.getLayers() [ i ];
 
-		const GX_NeuronPtrVector & neurons = layer->getNeurons();
+		fprintf( fp, "Layer#%ld: Type = %d; ActFuncType = %d; InputDims = %s;\n",
+				i, layer->getType(),
+				layer->getActFunc() ? layer->getActFunc()->getType() : -1,
+				gx_vector2string( layer->getInputDims() ).c_str() );
 
-		fprintf( fp, "Layer#%ld: NeuronCount = %ld, ActFuncType = %d\n",
-				i, neurons.size(), layer->getActFuncType() );
-
-		for( size_t j = 0; j < neurons.size(); j++ ) {
-			GX_Neuron * neuron = neurons[ j ];
-			const GX_DataVector & weights = neuron->getWeights();
-
-			fprintf( fp, "Neuron#%ld: WeightCount = %ld\n", j , weights.size() );
-			fprintf( fp, "Bias#%ld: %e\n", j, neurons[ j ]->getBias() );
-
-			fprintf( fp, "Weights#%ld:\n\t", j );
-
-			for( size_t k = 0; k < weights.size(); k++ ) {
-				fprintf( fp, "%s%e", 0 == k ? "" : ", ", weights[ k ] );
+		if( GX_BaseLayer::eMaxPool == layer->getType() ) {
+			fprintf( fp, "Weights: PoolSize = %zu;\n", ((GX_MaxPoolLayer*)layer)->getPoolSize() );
+		}
+		if( GX_BaseLayer::eAvgPool == layer->getType() ) {
+			fprintf( fp, "Weights: PoolSize = %zu;\n", ((GX_AvgPoolLayer*)layer)->getPoolSize() );
+		}
+		if( GX_BaseLayer::eConv == layer->getType() ) {
+			GX_ConvLayer * conv = (GX_ConvLayer*)layer;
+			fprintf( fp, "Weights: FilterDims = %s;\n", gx_vector2string( conv->getFilterDims() ).c_str() );
+			fprintf( fp, "%s\n", gx_vector2string( conv->getFilters() ).c_str() );
+			fprintf( fp, "Biases: Count = %zu;\n", conv->getBiases().size() );
+			fprintf( fp, "%s\n", gx_vector2string( conv->getBiases() ).c_str() );
+		}
+		if( GX_BaseLayer::eFullConn == layer->getType() ) {
+			GX_FullConnLayer * fc = (GX_FullConnLayer*)layer;
+			fprintf( fp, "Weights: Count = %zu;\n", fc->getWeights().size() );
+			for( size_t k = 0; k < fc->getWeights().size(); k++ ) {
+				fprintf( fp, "%s\n", gx_vector2string( fc->getWeights()[ k ] ).c_str() );
 			}
-			fprintf( fp, "\n" );
+			fprintf( fp, "Biases: Count = %zu;\n", fc->getBiases().size() );
+			fprintf( fp, "%s\n", gx_vector2string( fc->getBiases() ).c_str() );
 		}
 	}
 
@@ -299,80 +364,111 @@ bool GX_Utils :: save( const char * path, const GX_Network & network )
 
 bool GX_Utils :: load( const char * path, GX_Network * network )
 {
-	auto getNumber = []( std::string const & line, const char * fmt, double defaultValue ) {
-		double value = defaultValue;
-
+	auto getString = []( std::string const & line, const char * fmt, const char * defaultValue ) {
 		std::regex ex( fmt );
 		std::smatch match;
 
-		if( std::regex_search( line, match, ex ) ) value = std::stod( match[ match.size() - 1 ] );
+		std::string value = defaultValue;
+		if( std::regex_search( line, match, ex ) ) value = match[ match.size() - 1 ];
 
 		return value;
-	};
-
-	auto getNumberVector = []( std::string const & line, std::string * prefix, GX_DataVector * data ) {
-		const std::regex comma( "," );
-
-		std::vector< std::string > srow{
-			std::sregex_token_iterator( line.begin(), line.end(), comma, -1 ),
-			std::sregex_token_iterator() };
-
-		data->resize( srow.size() );
-		for( size_t i = 0; i < srow.size(); i++ ) {
-			( *data )[ i ] = std::stod( srow[ i ] );
-		}
 	};
 
 	std::ifstream fp( path );
 
 	if( !fp ) return false;
 
-	std::string line, name;
+	std::string line;
 
-	// Network: xxx
+	// Network: LayerCount = x; LossFuncType = x;
 	if( ! std::getline( fp, line ) ) return false;
 
-	network->setLossFuncType( getNumber( line, "LossFuncType = (\\d+)", GX_Network::eMeanSquaredError ) );
+	network->setLossFuncType( std::stoi( getString( line, "LossFuncType = (\\S+);", "1" ) ) );
 
-	int layerCount = getNumber( line, "LayerCount = (\\d+)", 0 );
+	int layerCount = std::stoi( getString( line, "LayerCount = (\\S+);", "0" ) );
 
 	network->getLayers().reserve( layerCount );
 
 	for( int i = 0; i < layerCount; i++ ) {
-		// Layer#x: xxx
+		//Layer#x: Type = x; ActFuncType = x; InputDims = c,x,y;
 		if( ! std::getline( fp, line ) ) return false;
 
-		int neuronCount = getNumber( line, "NeuronCount = (\\d+)", 0 );
-		int actFuncType = getNumber( line, "ActFuncType = (\\d+)", GX_Layer::eSigmoid );
+		GX_BaseLayer * layer = NULL;
 
-		GX_Layer * layer = NULL;
+		int layerType = std::stoi( getString( line, "Type = (\\S+);", "0" ) );
+		int actFuncType = std::stoi( getString( line, "ActFuncType = (\\S+);", "0" ) );
 
-		for( int j = 0; j < neuronCount; j++ ) {
+		GX_Dims inputDims;
+	       	gx_string2vector( getString( line, "InputDims = (\\S+);", "0" ), &inputDims );
 
-			// Neuron#x: xxx
+		if( GX_BaseLayer::eConv == layerType ) {
+			// Weights: FilterDims = f,c,x,y;
 			if( ! std::getline( fp, line ) ) return false;
 
-			int weightCount = getNumber( line, "WeightCount = (\\d+)", 0 );
+			GX_Dims filterDims;
+			gx_string2vector( getString( line, "FilterDims = (\\S+);", "0" ), &filterDims );
 
-			if( NULL == layer )  layer = new GX_Layer( neuronCount, weightCount, actFuncType );
-
-			GX_Neuron * neuron = layer->getNeurons()[ j ];
-
-			// Bias#x: xxx
 			if( ! std::getline( fp, line ) ) return false;
 
-			neuron->setBias( getNumber( line, ": (-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)", 0 ) );
+			GX_DataVector filters( gx_dims_flatten_size( filterDims ) );
+			gx_string2valarray( line, &filters );
 
-			// Weights#x: xxx:
+			// Biases: Count = xx;
 			if( ! std::getline( fp, line ) ) return false;
 
-			// xxx, xxx, xxx
+			GX_DataVector biases( filterDims[ 0 ] );
+
+			if( ! std::getline( fp, line ) ) return false;
+			gx_string2valarray( line, &biases );
+
+			layer = new GX_ConvLayer( inputDims, filters, filterDims, biases );
+		}
+		if( GX_BaseLayer::eMaxPool == layerType ) {
+			// Weights: PoolSize = xx;
 			if( ! std::getline( fp, line ) ) return false;
 
-			getNumberVector( line, NULL, &neuron->getWeights() );
+			int poolSize = std::stoi( getString( line, "PoolSize = (\\S+);", "0" ) );
+
+			layer = new GX_MaxPoolLayer( inputDims, poolSize );
+		}
+		if( GX_BaseLayer::eAvgPool == layerType ) {
+			// Weights: PoolSize = xx;
+			if( ! std::getline( fp, line ) ) return false;
+
+			int poolSize = std::stoi( getString( line, "PoolSize = (\\S+);", "0" ) );
+
+			layer = new GX_AvgPoolLayer( inputDims, poolSize );
+		}
+		if( GX_BaseLayer::eFullConn == layerType ) {
+			// Weights: Count = xx;
+			if( ! std::getline( fp, line ) ) return false;
+
+			int count = std::stoi( getString( line, "Count = (\\S+);", "0" ) );
+
+			layer = new GX_FullConnLayer( count, gx_dims_flatten_size( inputDims ) );
+
+			GX_DataMatrix weights( count );
+			for( int i = 0; i < count; i++ ) {
+				if( ! std::getline( fp, line ) ) return false;
+
+				weights[ i ].resize( gx_dims_flatten_size( inputDims ) );
+				gx_string2valarray( line, &( weights[ i ] ) );
+			}
+
+			// Biases: Count = xx;
+			if( ! std::getline( fp, line ) ) return false;
+
+			GX_DataVector biases( count );
+
+			if( ! std::getline( fp, line ) ) return false;
+			gx_string2valarray( line, &biases );
+
+			((GX_FullConnLayer*)layer)->setWeights( weights, biases );
 		}
 
-		network->getLayers().push_back( layer );
+		if( actFuncType > 0 ) layer->setActFunc( new GX_ActFunc( actFuncType ) );
+
+		network->addLayer( layer );
 	}
 
 	return true;

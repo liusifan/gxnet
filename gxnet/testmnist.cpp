@@ -1,4 +1,5 @@
 #include "gxnet.h"
+#include "gxact.h"
 #include "gxutils.h"
 
 #include <iostream>
@@ -140,7 +141,7 @@ void test( const CmdArgs_t & args )
 	{
 		GX_Network network;
 
-		//network.setLossFuncType( GX_Network::eCrossEntropy );
+		network.setLossFuncType( GX_Network::eCrossEntropy );
 
 		if( NULL != args.mModelPath && 0 == access( args.mModelPath, F_OK ) ) {
 			if(  GX_Utils::load( args.mModelPath, &network ) ) {
@@ -150,13 +151,20 @@ void test( const CmdArgs_t & args )
 				return;
 			}
 		} else {
-			network.addLayer( 30, input[ 0 ].size() );
-			network.addLayer( target[ 0 ].size(), 30 );
+			GX_BaseLayer * layer = NULL;
+
+			layer = new GX_FullConnLayer( 30, input[ 0 ].size() );
+			layer->setActFunc( GX_ActFunc::sigmoid() );
+			network.addLayer( layer );
+
+			layer = new GX_FullConnLayer( target[ 0 ].size(), layer->getOutputSize() );
+			layer->setActFunc( GX_ActFunc::softmax() );
+			network.addLayer( layer );
 		}
 
 		check( "before train", network, input4eval, target4eval, args.mIsDebug );
 
-		bool ret = network.train( input, target, args.mIsShuffle,
+		bool ret = network.train( input, target,
 				args.mEpochCount, args.mMiniBatchCount, args.mLearningRate, args.mLambda );
 
 		GX_Utils::save( path, network );

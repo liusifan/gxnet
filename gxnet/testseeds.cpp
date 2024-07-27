@@ -1,5 +1,6 @@
-#include "gxnet.h"
 #include "gxutils.h"
+#include "gxnet.h"
+#include "gxact.h"
 
 #include <iostream>
 #include <fstream>
@@ -9,6 +10,7 @@
 #include <random>
 #include <algorithm>
 #include <set>
+#include <limits.h>
 #include <float.h>
 
 #include <unistd.h>
@@ -42,7 +44,7 @@ bool loadData( const char * filename, GX_DataMatrix * data, std::set< int > * la
 
 	GX_DataVector min, max;
 	min.resize( data[ 0 ].size(), FLT_MAX );
-	max.resize( data[ 0 ].size(), FLT_MIN );
+	max.resize( data[ 0 ].size(), 1.0 * INT_MIN );
 
 	// normalize data
 	{
@@ -64,7 +66,8 @@ bool loadData( const char * filename, GX_DataMatrix * data, std::set< int > * la
 	return true;
 }
 
-void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_DataMatrix & target, bool isDebug )
+template< typename NetworkType >
+void check( const char * tag, NetworkType & network, GX_DataMatrix & input, GX_DataMatrix & target, bool isDebug )
 {
 	if( isDebug ) network.print();
 
@@ -150,14 +153,22 @@ void test( const CmdArgs_t & args )
 	{
 		GX_Network network;
 
+		network.setShuffle( args.mIsShuffle );
 		network.setLossFuncType( GX_Network::eCrossEntropy );
 
-		network.addLayer( 5, input[ 0 ].size(), GX_Layer::eSoftmax );
-		network.addLayer( target[ 0 ].size(), 5, GX_Layer::eSoftmax );
+		GX_BaseLayer * layer = NULL;
+
+		layer = new GX_FullConnLayer( 5, input[ 0 ].size() );
+		layer->setActFunc( GX_ActFunc::sigmoid() );
+		network.addLayer( layer );
+
+		layer = new GX_FullConnLayer( target[ 0 ].size(), layer->getOutputSize() );
+		layer->setActFunc( GX_ActFunc::softmax() );
+		network.addLayer( layer );
 
 		check( "before train", network, input4eval, target4eval, args.mIsDebug );
 
-		bool ret = network.train( input, target, args.mIsShuffle,
+		bool ret = network.train( input, target,
 			args.mEpochCount, args.mMiniBatchCount, args.mLearningRate, args.mLambda );
 
 		GX_Utils::save( path, network );
@@ -171,6 +182,8 @@ void test( const CmdArgs_t & args )
 		GX_Network network;
 
 		GX_Utils::load( path, &network );
+
+		network.print();
 
 		check( "load model", network, input4eval, target4eval, args.mIsDebug );
 	}

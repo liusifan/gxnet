@@ -15,11 +15,11 @@ LDFLAGS = -lstdc++ -lm
 
 PROGS = gxocr 
 
-TEST_PROGS = testbackward testseeds testmnist
+TEST_PROGS = testbackward testcnn testseeds testmnist
 
 ######################################################################
 
-COMM_OBJS = gxnet.o gxutils.o
+COMM_OBJS = gxutils.o gxact.o gxlayer.o gxnet.o
 
 ######################################################################
 
@@ -37,6 +37,9 @@ testseeds: $(COMM_OBJS) testseeds.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 testmnist: $(COMM_OBJS) testmnist.o
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+testcnn: $(COMM_OBJS) testcnn.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 #=====================================================================

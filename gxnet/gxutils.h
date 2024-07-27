@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gxnet.h"
+#include "gxcomm.h"
 
 #include <algorithm>
 
@@ -16,6 +16,7 @@ typedef struct tagCmdArgs {
 	const char * mModelPath;
 } CmdArgs_t;
 
+class GX_Network;
 
 class GX_Utils {
 public:
@@ -33,6 +34,8 @@ public:
 
 	static bool centerMnistImage( GX_DataVector & orgImage, GX_DataVector * newImage );
 
+	static bool expandMnistImage( GX_DataVector & orgImage, GX_DataVector * newImage );
+
 	static bool loadMnistImages( const int limitCount, const char * path, GX_DataMatrix * images );
 
 	static bool loadMnistLabels( int limitCount, const char * path, GX_DataMatrix * labels, int maxClasses );
@@ -41,6 +44,10 @@ public:
 			bool useSciFmt = true, bool colorMax = false);
 
 	static void printVector( const char * tag, const GX_DataVector & data, bool useSciFmt = true );
+
+	static void printVector( const char * tag, const GX_DataVector & data, const GX_Dims & dims, bool useSciFmt = true );
+
+	static void printMDSpan( const char * tag, const GX_MDSpanRO & data, bool useSciFmt = true );
 
 	static void addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src );
 

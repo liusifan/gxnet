@@ -61,9 +61,9 @@ int test( const char * modelFile, const char * imgFile )
 
 	if( ! GX_Utils::load( modelFile, &network ) ) return -1;
 
-	GX_DataVector * realInput = &input;
+	assert( input.size() == network.getLayers()[ 0 ]->getInputSize() );
 
-	bool ret = network.forward( *realInput, &output );
+	bool ret = network.forward( input, &output );
 
 	if( ! ret ) {
 		printf( "forward fail\n" );
