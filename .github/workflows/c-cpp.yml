@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: lfs
+      run: git lfs pull
     - name: make
       run: cd gxnet; make
     - name: unit test
