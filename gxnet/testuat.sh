@@ -1,23 +1,27 @@
 which python > /dev/null 2>&1|| alias python=python3
 
-if [ $# -eq 0 ];
-then
-	echo "Usage: $1 <jpeg image file/dir> [<model file>] [<uat suffix>]"
-	exit
-fi
+PROG=$0
 
-path=$1
+path=""
 model="mnist.model"
-suffix="mnist"
 
-if [ $# -gt 1 ];
-then
-	model=$2
-fi
+OPTSTRING=":m:p:"
 
-if [ $# -gt 2 ];
+while getopts ${OPTSTRING} opt; do
+	case ${opt} in
+		m)
+			model=${OPTARG}
+			;;
+		p)
+			path=${OPTARG}
+			;;
+	esac
+done
+
+if [ "" = "$path" ];
 then
-	suffix=$3
+	echo "Usage: $PROG -m <model path> -p <image file/dir>"
+	exit
 fi
 
 match=0
@@ -39,13 +43,16 @@ for i in $files;
 do
 	target=`echo $i | grep -Eo '([0-9]+)' | head -1`
 
-	test -f $i"."$suffix || python ./conv2mnist.py $i
+	test -f $i".mnist" || python ./conv2mnist.py $i
 
-	test -f $i"."$suffix && ./gxocr $model $i"."$suffix
+	test -f $i".mnist" && ./gxocr --model $model --file $i".mnist"
 
 	if [ "$target" -eq "$?" ];
 	then
 		match=$((match+1))
+		printf "\033[1A\033[70C\033[;32mPassed\033[0m\n"
+	else
+		printf "\033[1A\033[70C\033[;31mFailed\033[0m\n"
 	fi
 
 	total=$((total+1))

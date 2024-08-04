@@ -63,7 +63,7 @@ batch gradient { 4 }
 
 const char * TRAIN_EXAMPLES =
 R"(
-{{{ isFull true
+{{{ isDetail true
 Network: LayerCount = 2; LossFuncType = 1;
 
 Layer#0: Type = 4; ActFuncType = 1; InputDims = 2; OutputDims = 2;

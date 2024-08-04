@@ -14,6 +14,7 @@
 #include <algorithm>
 
 #include <unistd.h>
+#include <getopt.h>
 #include <assert.h>
 
 #include <arpa/inet.h>
@@ -41,28 +42,20 @@ GX_DataType GX_Utils :: random()
 	return dist( gen );
 }
 
-void GX_Utils :: addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src )
-{
-	assert( dest->size() == src.size() );
-
-	for( size_t i = 0; i < src.size(); i++ ) {
-		GX_DataVector & destVec = dest->at( i );
-		const GX_DataVector & srcVec = src[ i ];
-
-		assert( destVec.size() == srcVec.size() );
-
-		destVec += srcVec;
-	}
-}
-
 void GX_Utils :: printMnistImage( const char * tag, const GX_DataVector & data )
 {
 	printf( "%s { %ld }\n", tag, data.size() );
 
-	for( size_t i = 0; i < 28; i++ ) {
-		for( size_t j = 0; j < 28; j++ ) {
-			size_t idx = i * 28 + j;
-			printf( "%s ",  idx < data.size() && data[ idx ] != 0 ? "1" : "0" );
+	size_t len = sqrt( data.size() );
+
+	for( size_t i = 0; i < len ; i++ ) {
+		for( size_t j = 0; j < len; j++ ) {
+			size_t idx = i * len + j;
+			if( data[ idx ] != 0 ) {
+				printf( "\e[1;31m1\e[0m " );
+			} else {
+				printf( "0 " );
+			}
 		}
 		printf( "\n" );
 	}
@@ -133,7 +126,7 @@ bool GX_Utils :: expandMnistImage( GX_DataVector & orgImage, GX_DataVector * new
 
 	for( int x = 0; x < 28; x++ ) {
 		for( int y = 0; y < 28; y++ ) {
-			( *newImage )[ ( x + 2 ) * 28 + y + 2 ] = orgImage[ x * 28 + y ];
+			( *newImage )[ ( x + 2 ) * 32 + y + 2 ] = orgImage[ x * 28 + y ];
 		}
 	}
 
@@ -182,7 +175,7 @@ bool GX_Utils :: loadMnistImages( const int limitCount, const char * path, GX_Da
 			break;
 		}
 
-		images->push_back( GX_DataVector( imageSize ) );
+		images->emplace_back( GX_DataVector( imageSize ) );
 		for( int j = 0; j < imageSize; j++ ) {
 			images->back()[ j ] = buff[ j ] / 255.0;
 		}
@@ -231,7 +224,7 @@ bool GX_Utils :: loadMnistLabels( int limitCount, const char * path, GX_DataMatr
 			break;
 		}
 
-		labels->push_back( GX_DataVector( maxClasses ) );
+		labels->emplace_back( GX_DataVector( maxClasses ) );
 		labels->back()[ buff ] = 1;
 	}
 
@@ -474,53 +467,67 @@ bool GX_Utils :: load( const char * path, GX_Network * network )
 void GX_Utils :: getCmdArgs( int argc, char * const argv[],
 		const CmdArgs_t & defaultArgs, CmdArgs_t * args )
 {
+	static struct option opts[] = {
+		{ "model",     required_argument,  NULL, 1 },
+		{ "training",  required_argument,  NULL, 2 },
+		{ "eval",      required_argument,  NULL, 3 },
+		{ "epoch",     required_argument,  NULL, 4 },
+		{ "minibatch", required_argument,  NULL, 5 },
+		{ "lr",        required_argument,  NULL, 6 },
+		{ "lambda",    required_argument,  NULL, 7 },
+		{ "shuffle",   required_argument,  NULL, 8 },
+		{ "debug",     no_argument,        NULL, 9 },
+		{ "help",      no_argument,        NULL, 10 },
+		{ 0, 0, 0, 0}
+	};
+
 	extern char *optarg ;
 	int c ;
 
 	*args = defaultArgs;;
 
-	while( ( c = getopt ( argc, argv, "a:t:c:e:l:b:p:dv" )) != EOF ) {
+	while( ( c = getopt_long( argc, argv, "v", opts, NULL )) != EOF ) {
 		switch ( c ) {
-			case 't':
+			case 1:
+				args->mModelPath = optarg;
+				break;
+			case 2:
 				args->mTrainingCount = atoi( optarg );
 				break;
-			case 'c':
+			case 3:
 				args->mEvalCount = atoi( optarg );
 				break;
-			case 'e' :
+			case 4:
 				args->mEpochCount = atoi( optarg );
 				break;
-			case 'b':
+			case 5:
 				args->mMiniBatchCount = atoi( optarg );
 				break;;
-			case 'l':
+			case 6:
 				args->mLearningRate = std::stof( optarg );
 				break;
-			case 'a':
+			case 7:
 				args->mLambda = std::stof( optarg );
 				break;
-			case 's':
+			case 8:
 				args->mIsShuffle = 0 == atoi( optarg ) ? false : true;
 				break;
-			case 'd':
+			case 9:
 				args->mIsDebug = true;
-				break;
-			case 'p':
-				args->mModelPath = optarg;
 				break;
 			case '?' :
 			case 'v' :
 				printf( "Usage: %s [-v]\n", argv[ 0 ] );
-				printf( "\t-t <training data count> 0 for all, default is %d\n", defaultArgs.mTrainingCount );
-				printf( "\t-c <eval count> 0 for all, default is %d\n", defaultArgs.mEvalCount );
-				printf( "\t-e <epoch count> default is %d\n", defaultArgs.mEpochCount );
-				printf( "\t-b <mini batch count> default is %d\n", defaultArgs.mMiniBatchCount );
-				printf( "\t-l <learning rate> default is %.2f\n", defaultArgs.mLearningRate );
-				printf( "\t-a <lambda> default is %.2f\n", defaultArgs.mLambda );
-				printf( "\t-s <shuffle> 0 for no shuffle, otherwise shuffle, default is %d\n", defaultArgs.mIsShuffle );
-				printf( "\t-p <model path> if path exist, then continue training\n" );
-				printf( "\t-d debug mode on\n" );
-				printf( "\t-v show usage\n" );
+				printf( "\t--model <model path> if path exist, then continue training\n" );
+				printf( "\t--training <training data count> 0 for all, default is %d\n", defaultArgs.mTrainingCount );
+				printf( "\t--eval <eval count> 0 for all, default is %d\n", defaultArgs.mEvalCount );
+				printf( "\t--epoch <epoch count> default is %d\n", defaultArgs.mEpochCount );
+				printf( "\t--minibatch <mini batch count> default is %d\n", defaultArgs.mMiniBatchCount );
+				printf( "\t--lr <learning rate> default is %.2f\n", defaultArgs.mLearningRate );
+				printf( "\t--lambda <lambda> default is %.2f\n", defaultArgs.mLambda );
+				printf( "\t--shuffle <shuffle> 0 for no shuffle, otherwise shuffle, default is %d\n", defaultArgs.mIsShuffle );
+				printf( "\t--debug debug mode on\n" );
+				printf( "\t--help show usage\n" );
 				exit( 0 );
 		}
 	}

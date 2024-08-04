@@ -79,14 +79,14 @@ void GX_BaseLayer :: setDebug( bool isDebug )
 	mIsDebug = isDebug;
 }
 
-void GX_BaseLayer :: print( bool isFull ) const
+void GX_BaseLayer :: print( bool isDetail ) const
 {
 	printf( "Type = %d; ActFuncType = %d; InputDims = %s; OutputDims = %s;\n",
 			mType, mActFunc ? mActFunc->getType() : -1,
 			gx_vector2string( mInputDims ).c_str(),
 			gx_vector2string( mOutputDims ).c_str() );
 
-	printWeights( isFull );
+	printWeights( isDetail );
 }
 
 void GX_BaseLayer :: initGradientMatrix( GX_DataMatrix * gradient ) const
@@ -153,11 +153,11 @@ GX_ConvLayer :: ~GX_ConvLayer()
 {
 }
 
-void GX_ConvLayer :: printWeights( bool isFull ) const
+void GX_ConvLayer :: printWeights( bool isDetail ) const
 {
 	printf( "\nfilterDims = %s\n", gx_vector2string( mFilterDims ).c_str() );
 
-	if( !isFull ) return;
+	if( !isDetail ) return;
 
 	GX_Utils::printVector( "filters", mFilters, mFilterDims, false );
 	GX_Utils::printVector( "biases", mBiases, false );
@@ -297,7 +297,7 @@ void GX_ConvLayer :: rotate180Filter( const GX_DataVector & src, const GX_Dims &
 
 void GX_ConvLayer :: initGradientMatrix( GX_DataMatrix * gradient ) const
 {
-	gradient->push_back( GX_DataVector( gx_dims_flatten_size( mFilterDims ) ) );
+	gradient->emplace_back( GX_DataVector( gx_dims_flatten_size( mFilterDims ) ) );
 }
 
 void GX_ConvLayer :: collectGradient( const GX_DataVector & input, const GX_DataVector & output,
@@ -389,7 +389,7 @@ GX_MaxPoolLayer :: ~GX_MaxPoolLayer()
 {
 }
 
-void GX_MaxPoolLayer :: printWeights( bool isFull ) const
+void GX_MaxPoolLayer :: printWeights( bool isDetail ) const
 {
 	printf( "\nPoolSize = %zu\n", mPoolSize );
 }
@@ -480,7 +480,7 @@ GX_AvgPoolLayer :: ~GX_AvgPoolLayer()
 {
 }
 
-void GX_AvgPoolLayer :: printWeights( bool isFull ) const
+void GX_AvgPoolLayer :: printWeights( bool isDetail ) const
 {
 	printf( "\nPoolSize = %zu\n", mPoolSize );
 }
@@ -574,9 +574,9 @@ GX_FullConnLayer :: ~GX_FullConnLayer()
 {
 }
 
-void GX_FullConnLayer :: printWeights( bool isFull ) const
+void GX_FullConnLayer :: printWeights( bool isDetail ) const
 {
-	if( !isFull ) return;
+	if( !isDetail ) return;
 
 	printf( "Weights: Count = %zu; InputCount = %zu;\n", mWeights.size(), mWeights[ 0 ].size() );
 	for( size_t i = 0; i < mWeights.size() && i < 10; i++ ) {
@@ -635,7 +635,7 @@ void GX_FullConnLayer :: backpropagate( const GX_DataVector & /* unused */, cons
 void GX_FullConnLayer :: initGradientMatrix( GX_DataMatrix * gradient ) const
 {
 	for( size_t i = 0; i < getOutputSize(); i++ ) {
-		gradient->push_back( GX_DataVector( getInputSize() ) );
+		gradient->emplace_back( GX_DataVector( getInputSize() ) );
 	}
 }
 

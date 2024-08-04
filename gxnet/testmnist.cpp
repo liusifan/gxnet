@@ -1,96 +1,34 @@
 #include "gxnet.h"
 #include "gxact.h"
 #include "gxutils.h"
-
-#include <iostream>
-#include <fstream>
-#include <regex>
-#include <string>
-#include <map>
-#include <random>
-#include <algorithm>
-#include <set>
-#include <float.h>
+#include "gxeval.h"
 
 #include <unistd.h>
-#include <syslog.h>
-#include <stdio.h>
-
-void check( const char * tag, GX_Network & network, GX_DataMatrix & input, GX_DataMatrix & target, bool isDebug )
-{
-	printf( "%s( %s, ..., input { %ld }, target { %ld } )\n", __func__, tag, input.size(), target.size() );
-
-	if( isDebug ) network.print();
-
-	GX_DataMatrix confusionMatrix;
-	GX_DataVector targetTotal;
-
-	size_t maxClasses = target[ 0 ].size();
-	confusionMatrix.resize( maxClasses );
-	targetTotal.resize( maxClasses );
-	for( size_t i = 0; i < maxClasses; i++ ) confusionMatrix[ i ].resize( maxClasses, 0.0 );
-
-	int correct = 0;
-
-	for( size_t i = 0; i < input.size(); i++ ) {
-
-		GX_DataMatrix output;
-
-		bool ret = network.forward( input[ i ], &output );
-
-		if( ! ret ) {
-			printf( "forward fail\n" );
-			return;
-		}
-
-		int outputType = GX_Utils::max_index( std::begin( output.back() ), std::end( output.back() ) );
-		int targetType = GX_Utils::max_index( std::begin( target[ i ] ), std::end( target[ i ] ) );
-
-		if( isDebug ) printf( "forward %d, index %zu, %d %d\n", ret, i, outputType, targetType );
-
-		if( outputType == targetType ) correct++;
-
-		confusionMatrix[ targetType ][ outputType ] += 1;
-		targetTotal[ targetType ] += 1;
-
-		for( size_t j = 0; isDebug && j < output.back().size() && j < 10; j++ ) {
-			printf( "\t%zu %.8f %.8f\n", j, output.back()[ j ], target[ i ][ j ] );
-		}
-	}
-
-	printf( "check %s, %d/%ld = %.2f\n", tag, correct, input.size(), ((float)correct) / input.size() );
-
-	for( size_t i = 0; i < confusionMatrix.size(); i++ ) {
-		for( auto & item : confusionMatrix[ i ] ) item = item / targetTotal[ i ];
-	}
-
-	GX_Utils::printMatrix( "confusion matrix", confusionMatrix, false, true );
-}
 
 bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * target,
 		GX_DataMatrix * input4eval, GX_DataMatrix * target4eval )
 {
-	const char * path = "mnist/train-images.idx3-ubyte";
+	const char * path = "mnist/train-images-idx3-ubyte";
 	if( ! GX_Utils::loadMnistImages( args.mTrainingCount, path, input ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
-	path = "mnist/train-labels.idx1-ubyte";
+	path = "mnist/train-labels-idx1-ubyte";
 	if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target, 10 ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
 	// load rotated images
-	path = "mnist/train-images.idx3-ubyte.rot";
+	path = "mnist/train-images-idx3-ubyte.rot";
 	if( 0 == access( path, F_OK ) ) {
 		if( ! GX_Utils::loadMnistImages( args.mTrainingCount, path, input ) ) {
 			printf( "read %s fail\n", path );
 			return false;
 		}
 
-		path = "mnist/train-labels.idx1-ubyte.rot";
+		path = "mnist/train-labels-idx1-ubyte.rot";
 		if( ! GX_Utils::loadMnistLabels( args.mTrainingCount, path, target, 10 ) ) {
 			printf( "read %s fail\n", path );
 			return false;
@@ -103,18 +41,18 @@ bool loadData( const CmdArgs_t & args, GX_DataMatrix * input, GX_DataMatrix * ta
 	for( size_t i = 0; i < orgSize; i++ ) {
 		GX_DataVector newImage;
 		if( GX_Utils::centerMnistImage( ( *input )[ i ], &newImage ) ) {
-			input->push_back( newImage );
-			target->push_back( ( *target )[ i ] );
+			input->emplace_back( newImage );
+			target->emplace_back( ( *target )[ i ] );
 		}
 	}
 
-	path = "mnist/t10k-images.idx3-ubyte";
+	path = "mnist/t10k-images-idx3-ubyte";
 	if( ! GX_Utils::loadMnistImages( args.mEvalCount, path, input4eval ) ) {
 		printf( "read %s fail\n", path );
 		return false;
 	}
 
-	path = "mnist/t10k-labels.idx1-ubyte";
+	path = "mnist/t10k-labels-idx1-ubyte";
 	if( ! GX_Utils::loadMnistLabels( args.mEvalCount, path, target4eval, 10 ) ) {
 		printf( "read %s fail\n", path );
 		return false;
@@ -162,7 +100,9 @@ void test( const CmdArgs_t & args )
 			network.addLayer( layer );
 		}
 
-		check( "before train", network, input4eval, target4eval, args.mIsDebug );
+		gx_eval( "before train", network, input4eval, target4eval, args.mIsDebug );
+
+		network.print();
 
 		bool ret = network.train( input, target,
 				args.mEpochCount, args.mMiniBatchCount, args.mLearningRate, args.mLambda );
@@ -171,7 +111,7 @@ void test( const CmdArgs_t & args )
 
 		printf( "train %s\n", ret ? "succ" : "fail" );
 
-		check( "after train", network, input4eval, target4eval, args.mIsDebug );
+		//gx_eval( "after train", network, input4eval, target4eval, args.mIsDebug );
 	}
 
 	//load model
@@ -180,7 +120,7 @@ void test( const CmdArgs_t & args )
 
 		GX_Utils::load( path, &network );
 
-		check( "load model", network, input4eval, target4eval, args.mIsDebug );
+		gx_eval( "load model", network, input4eval, target4eval, args.mIsDebug );
 	}
 }
 

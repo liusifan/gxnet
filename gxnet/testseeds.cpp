@@ -34,7 +34,7 @@ bool loadData( const char * filename, GX_DataMatrix * data, std::set< int > * la
 			std::sregex_token_iterator( line.begin(), line.end(), comma, -1 ),
 			std::sregex_token_iterator() };
 
-		data->push_back( GX_DataVector( srow.size() ) );
+		data->emplace_back( GX_DataVector( srow.size() ) );
 
 		std::transform( srow.begin(), srow.end(), std::begin( data->back() ),
 				[](std::string const& val) {return std::stof(val); } );
@@ -110,10 +110,10 @@ void splitData( const CmdArgs_t & args, const GX_DataMatrix & data, const std::s
 		const GX_DataVector & item = data[ idxOfData[ n ] ];
 
 		// remove last element, it's the label
-		input4eval->push_back( GX_DataVector( item.size() - 1 ) );
+		input4eval->emplace_back( GX_DataVector( item.size() - 1 ) );
 		std::copy( std::begin( item ), std::end( item ) - 1, std::begin( input4eval->back() ) );
 
-		target4eval->push_back( GX_DataVector() );
+		target4eval->emplace_back( GX_DataVector() );
 		target4eval->back().resize( mapOflabels.size(), 0 );
 		target4eval->back()[ mapOflabels[ item[ item.size() - 1 ] ] ] = 1;
 
@@ -125,10 +125,10 @@ void splitData( const CmdArgs_t & args, const GX_DataMatrix & data, const std::s
 		const GX_DataVector & item = data[ idxOfData[ i ] ];
 
 		// remove last element, it's the label
-		input->push_back( GX_DataVector( item.size() - 1 ) );
+		input->emplace_back( GX_DataVector( item.size() - 1 ) );
 		std::copy( std::begin( item ), std::end( item ) - 1, std::begin( input->back() ) );
 
-		target->push_back( GX_DataVector() );
+		target->emplace_back( GX_DataVector() );
 		target->back().resize( mapOflabels.size(), 0 );
 		target->back()[ mapOflabels[ item[ item.size() - 1 ] ] ] = 1;
 	}

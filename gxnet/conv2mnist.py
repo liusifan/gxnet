@@ -72,7 +72,7 @@ def conv2mnist( path ):
 	new_img = resize2mnist( org_img )
 
 	# save the intermediate result for debug
-	new_img.save( path + ".bmp" )
+	#new_img.save( path + ".bmp" )
 
 	# save mnist data
 	fp = open( path + ".mnist", "w" )

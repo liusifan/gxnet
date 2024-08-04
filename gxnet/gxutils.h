@@ -49,8 +49,6 @@ public:
 
 	static void printMDSpan( const char * tag, const GX_MDSpanRO & data, bool useSciFmt = true );
 
-	static void addMatrix( GX_DataMatrix * dest, const GX_DataMatrix & src );
-
 	static bool save( const char * path, const GX_Network & network );
 
 	static bool load( const char * path, GX_Network * network );

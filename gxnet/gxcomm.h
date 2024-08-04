@@ -19,6 +19,12 @@ typedef std::vector< std::string > GX_StringList;
 typedef std::vector< size_t > GX_Dims;
 typedef std::vector< GX_Dims > GX_DimsList;
 
+inline void gx_add_matrix( GX_DataMatrix * dest, const GX_DataMatrix & src )
+{
+	assert( dest->size() == src.size() );
+	for( size_t i = 0; i < src.size(); i++ ) ( *dest )[ i ] += src[ i ];
+}
+
 inline size_t gx_dims_flatten_size( const GX_Dims & dims )
 {
 	size_t ret = dims.size() > 0 ? 1 : 0;
@@ -47,7 +53,7 @@ void gx_string2vector( const std::string & buff, NumberVector * vec, const char 
 	std::stringstream ss( buff );
 	std::string token;
 	while( std::getline( ss, token, delim ) ) {
-		vec->push_back( std::stod( token ) );
+		vec->emplace_back( std::stod( token ) );
 	}
 }
 

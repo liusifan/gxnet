@@ -3,12 +3,18 @@
 #include "gxcomm.h"
 #include "gxlayer.h"
 
+class GX_Network;
+
+typedef void ( * GX_OnEpochEnd_t )( GX_Network & network, int epoch, GX_DataType loss );
+
 class GX_Network {
 public:
-	enum { eNone, eMeanSquaredError, eCrossEntropy };
+	enum { eMeanSquaredError = 1, eCrossEntropy = 2 };
 
 	GX_Network( int lossFuncType = eMeanSquaredError );
 	~GX_Network();
+
+	void setOnEpochEnd( GX_OnEpochEnd_t onEpochEnd );
 
 	void setDebug( bool isDebug );
 
@@ -35,7 +41,7 @@ public:
 			int miniBatchCount, GX_DataType learningRate, GX_DataType lambda = 0,
 			GX_DataVector * losses = nullptr );
 
-	void print( bool isFull = false ) const;
+	void print( bool isDetail = false ) const;
 
 private:
 
@@ -52,7 +58,12 @@ private:
 
 	void initOutputAndDeltaMatrix( GX_DataMatrix * output, GX_DataMatrix * batchDelta, GX_DataMatrix * delta );
 
+	bool trainInternal( const GX_DataMatrix & input, const GX_DataMatrix & target, int epochCount,
+			int miniBatchCount, GX_DataType learningRate, GX_DataType lambda = 0,
+			GX_DataVector * losses = nullptr );
+
 private:
+	GX_OnEpochEnd_t mOnEpochEnd;
 	int mLossFuncType;
 	GX_BaseLayerPtrVector mLayers;
 	bool mIsDebug, mIsShuffle;

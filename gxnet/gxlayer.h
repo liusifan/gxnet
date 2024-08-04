@@ -12,7 +12,7 @@ class GX_ActFunc;
 
 class GX_BaseLayer {
 public:
-	enum { eNone, eConv, eMaxPool, eAvgPool, eFullConn };
+	enum { eConv = 1, eMaxPool = 2, eAvgPool = 3, eFullConn = 4 };
 
 public:
 	GX_BaseLayer( int type );
@@ -30,7 +30,7 @@ public:
 
 public:
 
-	virtual void print( bool isFull = false ) const;
+	virtual void print( bool isDetail = false ) const;
 
 	void forward( const GX_DataVector & input, GX_DataVector * output ) const;
 
@@ -39,7 +39,7 @@ public:
 
 protected:
 
-	virtual void printWeights( bool isFull ) const = 0;
+	virtual void printWeights( bool isDetail ) const = 0;
 
 	virtual void calcOutput( const GX_DataVector & input, GX_DataVector * output ) const = 0;
 
@@ -96,7 +96,7 @@ public:
 			GX_DataMatrix::const_iterator * iter, size_t miniBatchCount,
 			GX_DataType learningRate, GX_DataType lambda, size_t trainingCount );
 
-	void printWeights( bool isFull ) const;
+	void printWeights( bool isDetail ) const;
 
 protected:
 
@@ -130,7 +130,7 @@ public:
 	GX_MaxPoolLayer( const GX_Dims & inputDims, size_t poolSize );
 	~GX_MaxPoolLayer();
 
-	virtual void printWeights( bool isFull ) const;
+	virtual void printWeights( bool isDetail ) const;
 
 	size_t getPoolSize() const;
 
@@ -156,7 +156,7 @@ public:
 	GX_AvgPoolLayer( const GX_Dims & inputDims, size_t poolSize );
 	~GX_AvgPoolLayer();
 
-	virtual void printWeights( bool isFull ) const;
+	virtual void printWeights( bool isDetail ) const;
 
 	size_t getPoolSize() const;
 
@@ -186,7 +186,7 @@ public:
 	// for debug
 	void setWeights( const GX_DataMatrix & weights, const GX_DataVector & biases );
 
-	void printWeights( bool isFull ) const;
+	void printWeights( bool isDetail ) const;
 
 	const GX_DataMatrix & getWeights() const;
 

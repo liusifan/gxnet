@@ -6,8 +6,13 @@
 #include <numeric>
 #include <algorithm>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <chrono>
+
 GX_Network :: GX_Network( int lossFuncType )
 {
+	mOnEpochEnd = NULL;
 	mLossFuncType = lossFuncType;
 	mIsDebug = false;
 	mIsShuffle = true;
@@ -18,17 +23,22 @@ GX_Network :: ~GX_Network()
 	for( auto & item : mLayers ) delete item;
 }
 
-void GX_Network :: print( bool isFull ) const
+void GX_Network :: print( bool isDetail ) const
 {
-	printf( "\n{{{ isFull %s\n", isFull ? "true" : "false" );
+	printf( "\n{{{ isDetail %s\n", isDetail ? "true" : "false" );
 	printf( "Network: LayerCount = %zu; LossFuncType = %d;\n", mLayers.size(), mLossFuncType );
 	for( size_t i = 0; i < mLayers.size(); i++ ) {
 		GX_BaseLayer * layer = mLayers[ i ];
 
 		printf( "\nLayer#%ld: ", i );
-		layer->print( isFull );
+		layer->print( isDetail );
 	}
 	printf( "}}}\n\n" );
+}
+
+void GX_Network :: setOnEpochEnd( GX_OnEpochEnd_t onEpochEnd )
+{
+	mOnEpochEnd = onEpochEnd;
 }
 
 void GX_Network :: setDebug( bool isDebug )
@@ -72,7 +82,7 @@ void GX_Network :: addLayer( GX_BaseLayer * layer )
 {
 	layer->setDebug( mIsDebug );
 
-	mLayers.push_back( layer );
+	mLayers.emplace_back( layer );
 }
 
 bool GX_Network :: forward( const GX_DataVector & input, GX_DataMatrix * output ) const
@@ -84,7 +94,7 @@ bool GX_Network :: forward( const GX_DataVector & input, GX_DataMatrix * output 
 	}
 
 	if( output->size() == 0 ) {
-		for( auto & item : mLayers ) output->push_back( GX_DataVector( item->getOutputSize() ) );
+		for( auto & item : mLayers ) output->emplace_back( GX_DataVector( item->getOutputSize() ) );
 	}
 
 	const GX_DataVector * currInput = &input;
@@ -177,11 +187,11 @@ void GX_Network :: initGradientMatrix( GX_DataMatrix * batchGradient, GX_DataMat
 
 void GX_Network :: initOutputAndDeltaMatrix( GX_DataMatrix * output, GX_DataMatrix * batchDelta, GX_DataMatrix * delta )
 {
-	for( auto & item : mLayers ) output->push_back( GX_DataVector( item->getOutputSize() ) );
+	for( auto & item : mLayers ) output->emplace_back( GX_DataVector( item->getOutputSize() ) );
 
-	for( auto & item : mLayers ) delta->push_back( GX_DataVector( item->getOutputSize() ) );
+	for( auto & item : mLayers ) delta->emplace_back( GX_DataVector( item->getOutputSize() ) );
 
-	for( auto & item : *delta ) batchDelta->push_back( GX_DataVector( item.size() ) );
+	for( auto & item : *delta ) batchDelta->emplace_back( GX_DataVector( item.size() ) );
 }
 
 GX_DataType GX_Network :: calcLoss( const GX_DataVector & target, const GX_DataVector & output )
@@ -203,7 +213,7 @@ GX_DataType GX_Network :: calcLoss( const GX_DataVector & target, const GX_DataV
 	return ret;
 }
 
-bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & target, int epochCount,
+bool GX_Network :: trainInternal( const GX_DataMatrix & input, const GX_DataMatrix & target, int epochCount,
 		int miniBatchCount, GX_DataType learningRate, GX_DataType lambda, GX_DataVector * losses )
 {
 	if( input.size() != target.size() ) return false;
@@ -214,6 +224,7 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 			ctime( &beginTime ), input.size(), target.size() );
 
 	int logInterval = epochCount / 10;
+	int progressInterval = ( input.size() / miniBatchCount ) / 10;
 
 	std::random_device rd;
 	std::mt19937 gen( rd() );
@@ -255,8 +266,8 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 
 				collect( currInput, output, delta, &gradient );
 
-				GX_Utils::addMatrix( &batchDelta, delta );
-				GX_Utils::addMatrix( &batchGradient, gradient );
+				gx_add_matrix( &batchDelta, delta );
+				gx_add_matrix( &batchGradient, gradient );
 
 				GX_DataType loss = calcLoss( currTarget, output.back() );
 
@@ -274,20 +285,43 @@ bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & tar
 
 			begin += miniBatchCount;
 			end = begin + miniBatchCount;
+
+			if( progressInterval > 0 && 0 == ( begin % ( progressInterval * miniBatchCount ) ) ) {
+				printf( "\r%zu / %zu", begin, idxOfData.size() );
+				fflush( stdout );
+			}
 		}
 
 		if( NULL != losses ) ( *losses )[ n ] = totalLoss / input.size();
 
 		if( logInterval <= 1 || ( logInterval > 1 && 0 == n % logInterval ) || n == ( epochCount - 1 ) ) {
 			time_t currTime = time( NULL );
-			printf( "%s\tinterval %ld [>] epoch %d, lr %f, loss %.8f\n",
+			printf( "\r%s\tinterval %ld [>] epoch %d, lr %f, loss %.8f\n",
 				ctime( &currTime ), currTime - beginTime, n, learningRate, totalLoss / input.size() );
 			beginTime = time( NULL );
 		}
 
 		if( mIsDebug ) print();
+
+		if( mOnEpochEnd ) mOnEpochEnd( *this, n, totalLoss / input.size() );
 	}
 
 	return true;
+}
+
+bool GX_Network :: train( const GX_DataMatrix & input, const GX_DataMatrix & target, int epochCount,
+		int miniBatchCount, GX_DataType learningRate, GX_DataType lambda, GX_DataVector * losses )
+{
+	std::chrono::steady_clock::time_point beginTime = std::chrono::steady_clock::now();	
+
+	bool ret = trainInternal( input, target, epochCount, miniBatchCount, learningRate, lambda, losses );
+
+	std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();	
+
+	auto timeSpan = std::chrono::duration_cast<std::chrono::milliseconds>( endTime - beginTime );
+
+	printf( "Elapsed time: %.3f\n", timeSpan.count() / 1000.0 );
+
+	return ret;
 }
 

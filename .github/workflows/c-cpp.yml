@@ -17,6 +17,8 @@ jobs:
       run: cd gxnet; make
     - name: unit test
       run: cd gxnet; ./testbackward 
+    - name: testcnn
+      run: cd gxnet; ./testcnn
     - name: testseeds
       run: cd gxnet; ./testseeds
     - name: Install Python PIL
@@ -25,3 +27,5 @@ jobs:
       run: pip install numpy
     - name: launch mnist
       run: cd gxnet; sh launch_mnist.sh
+    - name: launch emnist
+      run: cd gxnet; sh launch_emnist.sh

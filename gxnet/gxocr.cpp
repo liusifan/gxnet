@@ -13,6 +13,7 @@
 
 #include <unistd.h>
 #include <syslog.h>
+#include <getopt.h>
 
 bool readImage( const char * path, GX_DataVector * input )
 {
@@ -61,7 +62,11 @@ int test( const char * modelFile, const char * imgFile )
 
 	if( ! GX_Utils::load( modelFile, &network ) ) return -1;
 
-	assert( input.size() == network.getLayers()[ 0 ]->getInputSize() );
+	if( input.size() < network.getLayers()[ 0 ]->getInputSize() ) {
+		GX_DataVector newInput;
+		GX_Utils::expandMnistImage( input, &newInput );
+		input = newInput;
+	}
 
 	bool ret = network.forward( input, &output );
 
@@ -74,30 +79,45 @@ int test( const char * modelFile, const char * imgFile )
 
 	printf( "%s    \t-> %d, nn.output %f\n", imgFile, result, output.back()[ result ] );
 
-	if( output.back()[ result ] < 0.5 ) {
-		//GX_DataType outputTotal = std::accumulate( output.back().begin(), output.back().end(), 0.0 );
-		for( size_t i = 0; i < output.back().size(); i++ ) {
-			//printf( "\t%zu %.2f %.2f\n", i, output.back()[ i ], output.back()[ i ] / outputTotal );
-		}
-	}
-
 	return result;
+}
+
+void usage( const char * name )
+{
+	printf( "%s --model <model file> --file <mnist file>\n", name );
 }
 
 int main( const int argc, char * argv[] )
 {
-	if( argc < 3 ) {
-		printf( "%s <mnist model file> <bmp file>\n", argv[ 0 ] );
-		return -1;
+	static struct option opts[] = {
+		{ "model",   required_argument,  NULL, 1 },
+		{ "file",  required_argument,  NULL, 2 },
+		{ 0, 0, 0, 0}
+	};
+
+	char * model = NULL, * file = NULL;
+
+	int c = 0;
+	while( ( c = getopt_long( argc, argv, "", opts, NULL ) ) != EOF ) {
+		switch( c ) {
+			case 1:
+				model = optarg;
+				break;
+			case 2:
+				file = optarg;
+				break;
+			default:
+				usage( argv[ 0 ] );
+				break;
+		}
 	}
 
-	openlog( argv[0], LOG_PID | LOG_CONS | LOG_PERROR | LOG_NDELAY, LOG_USER );
+	if( NULL == model || NULL == file ) {
+		usage( argv[ 0 ] );
+		return 0;
+	}
 
-	setlogmask(LOG_UPTO(LOG_DEBUG));
-
-	int ret = test( argv[1], argv[2] );
-
-	closelog();
+	int ret = test( model, file );
 
 	return ret;
 }

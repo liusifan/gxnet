@@ -4,7 +4,7 @@
 
 class GX_ActFunc {
 public:
-	enum { eNone, eSigmoid, eLeakyReLU, eTanh, eSoftmax };
+	enum { eSigmoid = 1, eLeakyReLU = 2, eTanh = 3, eSoftmax = 4 };
 public:
 	GX_ActFunc( int type );
 
